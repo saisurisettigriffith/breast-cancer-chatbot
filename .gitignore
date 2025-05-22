@@ -1,8 +1,6 @@
 # ignore any generated JSON creds in target/classes
-target/classes/com/example/breastcancer/breast-cancer-react-*.json
-
-# if you accidentally checked in the source JSON too:
-src/main/java/com/example/breastcancer/breast-cancer-react-*.json
+target/
+resources/
 
 # ignore your combine.py script
 src/main/java/com/example/breastcancer/combine.py

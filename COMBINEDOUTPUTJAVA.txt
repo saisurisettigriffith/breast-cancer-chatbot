@@ -1,0 +1,1038 @@
+"pom.xml: "
+"<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>breast-cancer-chatbot</artifactId>
+  <version>2.0</version>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>11</maven.compiler.source>
+    <maven.compiler.target>11</maven.compiler.target>
+  </properties>
+
+  <dependencies>
+    <!-- JSON -->
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>2.10.1</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+          </descriptorRefs>
+          <archive>
+            <manifest>
+              <mainClass>com.example.breastcancer.MainApp</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals>
+              <goal>single</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>"
+
+".vscode - Start :"
+"settings.json: "
+"{
+    "java.configuration.updateBuildConfiguration": "interactive"
+}"
+
+".vscode - End"
+
+"src - Start :"
+"main - Start :"
+"java - Start :"
+"com - Start :"
+"example - Start :"
+"breastcancer - Start :"
+"ApiClient.java: "
+"package com.example.breastcancer;
+
+import com.google.gson.JsonObject;
+
+/**
+ * Lean interface – higher‑level code depends on this abstraction rather than
+ * on java.net.http.  We add two default helpers so callers can still use the
+ * familiar postRisk / postChat methods exactly like in the original code.
+ */
+public interface ApiClient {
+
+    /** Low‑level generic POST (path starts with "/api/"). */
+    JsonObject post(String path, JsonObject body) throws Exception;
+
+    /* ───────────────── convenience helpers ───────────────── */
+
+    default JsonObject postRisk(JsonObject body) throws Exception {
+        return post("/api/risk", body);
+    }
+
+    default JsonObject postChat(JsonObject body) throws Exception {
+        return post("/api/chat", body);
+    }
+}"
+
+"ChatMessage.java: "
+"// ChatMessage.java
+package com.example.breastcancer;
+
+public final class ChatMessage {
+    private final String sender;
+    private final String text;
+
+    public ChatMessage(String sender, String text) {
+        this.sender = sender;
+        this.text = text;
+    }
+    public String getSender() { return sender; }
+    public String getText() { return text; }
+}"
+
+"ChatPanel.java: "
+"package com.example.breastcancer;
+
+import java.awt.BorderLayout;
+import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingWorker;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+
+/**
+ * Restores the simple Chat UI from the original code so MainApp compiles.
+ */
+public class ChatPanel extends JPanel {
+
+    private final ApiClient api;
+    private final String    sessionId;
+    private final List<JsonObject> riskCache;
+
+    private final JTextArea  chatArea  = new JTextArea();
+    private final JTextField inputFld  = new JTextField();
+    private final JButton    sendBtn   = new JButton("Send");
+
+    private final Gson gson = new Gson();
+
+    public ChatPanel(ApiClient api, String sessionId, List<JsonObject> riskCache, String greeting) {
+        this.api       = api;
+        this.sessionId = sessionId;
+        this.riskCache = riskCache;
+        build(greeting);
+    }
+
+    /* ---------------- build UI ---------------- */
+    private void build(String greeting) {
+        setLayout(new BorderLayout(10, 10));
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        chatArea.setEditable(false);
+        chatArea.setLineWrap(true);
+        chatArea.setWrapStyleWord(true);
+        add(new JScrollPane(chatArea), BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel(new BorderLayout(5, 5));
+        bottom.add(inputFld, BorderLayout.CENTER);
+        bottom.add(sendBtn,  BorderLayout.EAST);
+        add(bottom, BorderLayout.SOUTH);
+
+        appendAssistant(greeting);
+
+        /* ---- listeners (anonymous inner classes, no lambdas) ---- */
+        sendBtn.addActionListener(new java.awt.event.ActionListener() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+        });
+        inputFld.addActionListener(new java.awt.event.ActionListener() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+        });
+    }
+
+    /* ---------------- behaviour ---------------- */
+    private void submit() {
+        String msg = inputFld.getText().trim();
+        if (msg.isEmpty()) return;
+        appendUser(msg);
+        inputFld.setText("");
+        sendBtn.setEnabled(false);
+
+        new SwingWorker<Void, Void>() {
+            private String answer;
+            @Override protected Void doInBackground() throws Exception {
+                JsonObject body = new JsonObject();
+                body.addProperty("session_id", sessionId);
+                body.add("riskData", gson.toJsonTree(riskCache));
+                body.addProperty("input", msg);
+                JsonObject res = api.postChat(body);
+                answer = res.get("answer").getAsString();
+                return null;
+            }
+            @Override protected void done() {
+                appendAssistant(answer);
+                sendBtn.setEnabled(true);
+            }
+        }.execute();
+    }
+
+    /* ---------------- helpers ---------------- */
+    private void appendUser(String txt)      { chatArea.append("You: " + txt + "\n\n"); }
+    private void appendAssistant(String txt) { chatArea.append("Bot: " + txt + "\n\n"); }
+}"
+
+"GreetingBuilder.java: "
+"package com.example.breastcancer;
+
+
+/** Builds the long greeting paragraph exactly like the original code did. */
+public class GreetingBuilder {
+
+    public String build(RiskAssessment ra) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Hello! I’m your Breast Cancer ChatBot. I’ll be assisting you based on your health information and the GAIL model predictions. ");
+
+        sb.append("• Your inputs: ");
+        sb.append(inputSummary(ra.getInput()));
+        sb.append(". • GAIL predictions: ");
+        sb.append(resultSummary(ra.getResult()));
+        sb.append(". All responses will be based on your provided health information and predictions from the GAIL model.");
+        return sb.toString();
+    }
+
+    private String inputSummary(RiskInput in) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("age=").append(in.getAge()).append(", ");
+        sb.append("menarch=").append(in.getMenarchAgeIndex()).append(", ");
+        sb.append("liveBirth=").append(in.getLiveBirthAgeIndex()).append(", ");
+        sb.append("biopsy=").append(in.getBiopsyIndex()).append(", ");
+        sb.append("numBiopsy=").append(in.getNumBiopsyIndex()).append(", ");
+        sb.append("ihyp=").append(in.getIhypIndex()).append(", ");
+        sb.append("relatives=").append(in.getRelativesIndex()).append(", ");
+        sb.append("race=").append(in.getRaceCode());
+        return sb.toString();
+    }
+
+    private String resultSummary(RiskResult r) {
+        StringBuilder sb = new StringBuilder();
+        sb.append("5‑year=" ).append(r.getFiveYearRisk()).append(", ");
+        sb.append("lifetime=").append(r.getLifetimeRisk());
+        return sb.toString();
+    }
+}"
+
+"HttpApiClient.java: "
+"package com.example.breastcancer;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+/** Concrete implementation that wraps java.net.http. */
+public class HttpApiClient implements ApiClient {
+
+    private static final String BASE = System.getenv().getOrDefault(
+            "REACT_APP_API_BASE_URL",
+            "https://breast-cancer-flask-455419.ew.r.appspot.com");
+
+    private final HttpClient client = HttpClient.newHttpClient();
+    private final Gson       gson   = new Gson();
+
+    @Override
+    public JsonObject post(String path, JsonObject body) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(BASE + path))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body), StandardCharsets.UTF_8))
+                .build();
+
+        HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
+        if (res.statusCode() < 200 || res.statusCode() >= 300) {
+            throw new RuntimeException("Server responded: " + res.statusCode());
+        }
+        return JsonParser.parseString(res.body()).getAsJsonObject();
+    }
+}"
+
+"MainApp.java: "
+"package com.example.breastcancer;
+
+import java.awt.CardLayout;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+
+import com.google.gson.JsonObject;
+
+/**
+ * Application entry‑point (single‑package version).
+ */
+public class MainApp extends JFrame implements RiskSubmitListener {
+
+    private final CardLayout cards = new CardLayout();
+    private final JPanel     root  = new JPanel(cards);
+
+    /* ───────── dependencies ───────── */
+    private final ApiClient              api         = new HttpApiClient();
+    private final RiskCalculationService calcService = new RiskCalculationService(api);
+
+    /* ───────── session state ───────── */
+    private final List<JsonObject> riskCache = new ArrayList<>();
+    private final String           sessionId = UUID.randomUUID().toString().substring(0, 8);
+
+    public MainApp() {
+        super("Breast Cancer ChatBot");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(820, 640);
+        setLocationRelativeTo(null);
+
+        RiskFormController formController = new RiskFormController(calcService, this);
+        root.add(new RiskFormPanel(formController), "form");
+        add(root);
+    }
+
+    /** Callback invoked by RiskFormController after successful calculation. */
+    @Override
+    public void onRiskSuccess(JsonObject merged, String greeting) {
+        riskCache.add(merged);
+        ChatPanel chat = new ChatPanel(api, sessionId, riskCache, greeting);
+        root.add(chat, "chat");
+        cards.show(root, "chat");
+    }
+
+    public static void main(String[] args) throws Exception {
+        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override public void run() { new MainApp().setVisible(true); }
+        });
+    }
+}"
+
+"RiskAssessment.java: "
+"package com.example.breastcancer;
+
+import com.google.gson.JsonObject;
+
+/**
+ * Bundles the user input, the parsed numerical results *and* the raw “results”
+ * object that comes back from the Flask /api/risk route.  Keeping the raw JSON
+ * lets us flatten everything – exactly like the original React code did –
+ * without having to predict which fields may appear in the future.
+ */
+public class RiskAssessment {
+
+    private RiskInput  input;
+    private RiskResult result;
+    private JsonObject rawResults;   // ← new
+
+    /* ───── generated getters / setters ───── */
+
+    public RiskInput getInput() { return input; }
+    public void setInput(RiskInput input) { this.input = input; }
+
+    public RiskResult getResult() { return result; }
+    public void setResult(RiskResult result) { this.result = result; }
+
+    /** Full copy of the “results” object (five_year_abs, lifetime_abs, …). */
+    public JsonObject getRawResults() { return rawResults; }
+    public void setRawResults(JsonObject rawResults) { this.rawResults = rawResults; }
+}
+"
+
+"RiskCalculationService.java: "
+"package com.example.breastcancer;
+
+import com.google.gson.JsonObject;
+
+/** Use‑case class that hides the HTTP call from callers. */
+class RiskCalculationService {
+    private ApiClient apiClient;
+    private RiskResponseMapper mapper = new RiskResponseMapper();
+
+    RiskCalculationService(ApiClient apiClient) {
+        this.apiClient = apiClient;
+    }
+
+    RiskAssessment calculate(RiskInput input) throws Exception {
+        JsonObject reqBody = mapper.toRequestJson(input);
+        JsonObject resJson = apiClient.postRisk(reqBody);
+        return mapper.toDomain(input, resJson);
+    }
+}"
+
+"RiskFormController.java: "
+"package com.example.breastcancer;
+
+import java.util.Map;
+
+import javax.swing.JOptionPane;
+import javax.swing.SwingWorker;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
+/**
+ * Orchestrates the form-submit flow:
+ *   1. Runs the HTTP call on a background thread.
+ *   2. Builds a *flat* JSON object that merges user input + all Gail results –
+ *      exactly like the original React and “WORKINGJAVACODEBASE” versions.
+ *   3. Shows a friendly dialog if anything goes wrong.
+ */
+public class RiskFormController {
+
+    private final RiskCalculationService service;
+    private final GreetingBuilder        greetingBuilder = new GreetingBuilder();
+    private final RiskSubmitListener     listener;
+    private final RiskResponseMapper     mapper          = new RiskResponseMapper();
+
+    public RiskFormController(RiskCalculationService service,
+                              RiskSubmitListener      listener) {
+        this.service  = service;
+        this.listener = listener;
+    }
+
+    /** Invoked by the Swing panel when the user clicks “Calculate Risk”. */
+    public void onSubmit(final RiskInput input) {
+
+        new SwingWorker<Void, Void>() {
+
+            private JsonObject merged;
+            private String     greeting;
+            private Exception  error;
+
+            @Override
+            protected Void doInBackground() {
+                try {
+                    /* ---- 1. back-end call ---- */
+                    RiskAssessment ra = service.calculate(input);
+
+                    /* ---- 2. flatten (React logic) ---- */
+                    merged = mapper.toRequestJson(input);   // start with form fields
+
+                    /* Copy *every* Gail field so the back-end receives the same
+                     * rich vital string the React version sends.                */
+                    JsonObject results = ra.getRawResults();
+                    java.util.Iterator<Map.Entry<String, JsonElement>> it =
+                            results.entrySet().iterator();
+                    while (it.hasNext()) {
+                        Map.Entry<String, JsonElement> e = it.next();
+                        merged.add(e.getKey(), e.getValue());
+                    }
+
+                    greeting = greetingBuilder.build(ra);
+
+                } catch (Exception ex) {
+                    error = ex;
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                if (error != null) {
+                    JOptionPane.showMessageDialog(
+                        null,
+                        "Unable to calculate risk right now.\nDetails: " + error,
+                        "Connection problem",
+                        JOptionPane.ERROR_MESSAGE
+                    );
+                    return;
+                }
+                listener.onRiskSuccess(merged, greeting);
+            }
+        }.execute();
+    }
+}
+"
+
+"RiskFormPanel.java: "
+"package com.example.breastcancer;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Font;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingConstants;
+
+public class RiskFormPanel extends JPanel {
+    public static final int[] RACE_VALUES = { 1, 2, 3, 7, 8, 9, 10, 11, 12 };
+
+    private final RiskFormController controller;
+
+    private JSpinner ageSpinner;
+    private JComboBox<String> menarchBox;
+    private JComboBox<String> liveBirthBox;
+    private JComboBox<String> biopsyBox;
+    private JComboBox<String> numBiopsyBox;
+    private JComboBox<String> ihypBox;
+    private JComboBox<String> relativesBox;
+    private JComboBox<String> raceBox;
+    private JPanel biopsyDetails;
+    private JButton submitBtn;
+    private JLabel errorLabel;
+
+    public RiskFormPanel(RiskFormController controller) {
+        this.controller = controller;
+        build();
+    }
+
+    private void build() {
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
+
+        add(centeredLabel("Breast Cancer Risk Parameters", 18f));
+
+        ageSpinner = new JSpinner(new SpinnerNumberModel(48, 35, 85, 1));
+        add(labeled("Woman’s current age (35–85):", ageSpinner));
+
+        menarchBox = new JComboBox<>(new String[]{
+            "≥ 14 yrs / Unknown", "12 – 13 yrs", "7 – 11 yrs"
+        });
+        add(labeled("Age at first period:", menarchBox));
+
+        liveBirthBox = new JComboBox<>(new String[]{
+            "Unknown or < 20 yrs", "20 – 24 yrs", "25 – 29 yrs or No births", "≥ 30 yrs"
+        });
+        add(labeled("Age at first live birth:", liveBirthBox));
+
+        biopsyBox = new JComboBox<>(new String[]{"No / Unknown", "Yes"});
+        add(labeled("Ever had biopsy?", biopsyBox));
+
+        biopsyDetails = new JPanel();
+        biopsyDetails.setLayout(new BoxLayout(biopsyDetails, BoxLayout.Y_AXIS));
+        numBiopsyBox = new JComboBox<>(new String[]{
+            "0 biopsies", "1 biopsy or unknown count", "> 1 biopsy"
+        });
+        ihypBox = new JComboBox<>(new String[]{
+            "No atypical hyperplasia", "Yes", "Unknown / Not applicable"
+        });
+        biopsyDetails.add(labeled("Number of biopsies:", numBiopsyBox));
+        biopsyDetails.add(labeled("Atypical hyperplasia?", ihypBox));
+        add(biopsyDetails);
+        biopsyDetails.setVisible(false);
+
+        // Anonymous inner class (no lambdas) to toggle biopsy detail panel
+        biopsyBox.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                biopsyDetails.setVisible(biopsyBox.getSelectedIndex() == 1);
+            }
+        });
+
+        relativesBox = new JComboBox<>(new String[]{
+            "0 relatives / Unknown", "1", "> 1"
+        });
+        add(labeled("First-degree relatives with breast cancer:", relativesBox));
+
+        raceBox = new JComboBox<>(new String[]{
+            "White / Unknown / American-Indian", "African-American", "Hispanic",
+            "Chinese", "Japanese", "Filipino", "Hawaiian",
+            "Other Pacific Islander", "Other Asian-American"
+        });
+        add(labeled("Race / Ethnicity:", raceBox));
+
+        errorLabel = new JLabel(" ");
+        errorLabel.setForeground(Color.RED);
+        add(errorLabel);
+
+        submitBtn = new JButton("Calculate Risk");
+        submitBtn.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                submit();
+            }
+        });
+        add(Box.createRigidArea(new Dimension(0, 10)));
+        add(submitBtn);
+    }
+
+    private JLabel centeredLabel(String text, float size) {
+        JLabel lbl = new JLabel(text, SwingConstants.CENTER);
+        lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+        lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, size));
+        lbl.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
+        return lbl;
+    }
+
+    private JPanel labeled(String label, JComponent comp) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        JLabel l = new JLabel(label);
+        l.setPreferredSize(new Dimension(280, 28));
+        p.add(l, BorderLayout.WEST);
+        p.add(comp, BorderLayout.CENTER);
+        return p;
+    }
+
+    /** Collects widget values, validates, then hands the input object to the controller. */
+    private void submit() {
+        int age = ((Integer) ageSpinner.getValue()).intValue();
+        if (age < 35 || age > 85) {
+            errorLabel.setText("Age must be between 35 and 85.");
+            return;
+        }
+        errorLabel.setText("Calculating…");
+        submitBtn.setEnabled(false);
+
+        RiskInput input = new RiskInput();
+        input.setAge(age);
+        input.setMenarchAgeIndex(menarchBox.getSelectedIndex());
+        input.setLiveBirthAgeIndex(liveBirthBox.getSelectedIndex());
+
+        int biopsyIdx = biopsyBox.getSelectedIndex();
+        input.setBiopsyIndex(biopsyIdx);
+        if (biopsyIdx == 0) {
+            input.setNumBiopsyIndex(0);
+            input.setIhypIndex(99);
+        } else {
+            input.setNumBiopsyIndex(numBiopsyBox.getSelectedIndex());
+            int ihypVal = ihypBox.getSelectedIndex();
+            if (ihypVal == 2) {
+                ihypVal = 99;
+            }
+            input.setIhypIndex(ihypVal);
+        }
+
+        input.setRelativesIndex(relativesBox.getSelectedIndex());
+        input.setRaceCode(RACE_VALUES[raceBox.getSelectedIndex()]);
+
+        // Delegate to controller (it re‑enables the button via listener callback)
+        controller.onSubmit(input);
+    }
+
+    /** Allows controller to re‑enable the Calculate button after completion. */
+    public void enableSubmitButton() {
+        submitBtn.setEnabled(true);
+    }
+}"
+
+"RiskInput.java: "
+"package com.example.breastcancer;
+
+/**
+ * Plain‑old data holder for all parameters entered in the GUI.  We keep simple
+ * fields + getters/setters, then add a few *derived* helpers expected by
+ * RiskAssessmentService so no other class has to recalculate the codes.
+ */
+public class RiskInput {
+    private int age;
+    private int menarchAgeIndex;
+    private int liveBirthAgeIndex;
+    private int biopsyIndex;
+    private int numBiopsyIndex;
+    private int ihypIndex;
+    private int relativesIndex;
+    private int raceCode;
+
+    /* ───── generated getters / setters (no lambdas, no for‑each) ───── */
+    public int getAge() { return age; }
+    public void setAge(int age) { this.age = age; }
+
+    public int getMenarchAgeIndex() { return menarchAgeIndex; }
+    public void setMenarchAgeIndex(int menarchAgeIndex) { this.menarchAgeIndex = menarchAgeIndex; }
+
+    public int getLiveBirthAgeIndex() { return liveBirthAgeIndex; }
+    public void setLiveBirthAgeIndex(int liveBirthAgeIndex) { this.liveBirthAgeIndex = liveBirthAgeIndex; }
+
+    public int getBiopsyIndex() { return biopsyIndex; }
+    public void setBiopsyIndex(int biopsyIndex) { this.biopsyIndex = biopsyIndex; }
+
+    public int getNumBiopsyIndex() { return numBiopsyIndex; }
+    public void setNumBiopsyIndex(int numBiopsyIndex) { this.numBiopsyIndex = numBiopsyIndex; }
+
+    public int getIhypIndex() { return ihypIndex; }
+    public void setIhypIndex(int ihypIndex) { this.ihypIndex = ihypIndex; }
+
+    public int getRelativesIndex() { return relativesIndex; }
+    public void setRelativesIndex(int relativesIndex) { this.relativesIndex = relativesIndex; }
+
+    public int getRaceCode() { return raceCode; }
+    public void setRaceCode(int raceCode) { this.raceCode = raceCode; }
+
+    /* ───── derived helpers required by RiskAssessmentService ───── */
+    public int  getMenarchAgeCode()          { return menarchAgeIndex;            }
+    public int  getFirstLiveBirthCode()      { return liveBirthAgeIndex;          }
+    public boolean isHadBiopsy()             { return biopsyIndex == 1;           }
+    public int  getBiopsyCountCode()         { return numBiopsyIndex;             }
+    public int  getHyperplasiaCode()         { return ihypIndex;                  }
+    public int  getFirstDegreeRelativesCode(){ return relativesIndex;             }
+}"
+
+"RiskResponseMapper.java: "
+"package com.example.breastcancer;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
+/**
+ * Builds the exact request body expected by the Flask back-end and converts the
+ * reply to Java domain objects.  This version understands the *current* field
+ * names used by the open-source GAIL endpoint:
+ *
+ *   • five_year_abs   /  five_year_ave
+ *   • lifetime_abs    /  lifetime_ave
+ *
+ * For robustness we still accept the older
+ * absolute_risk_5yr / absolute_risk_lifetime names some deployments use.
+ */
+public class RiskResponseMapper {
+
+    /* ───────────────── request side ───────────────── */
+
+    public JsonObject toRequestJson(RiskInput in) {
+        JsonObject body = new JsonObject();
+
+        body.addProperty("age",               in.getAge());
+        body.addProperty("menarch_age",       in.getMenarchAgeIndex());
+        body.addProperty("live_birth_age",    in.getLiveBirthAgeIndex());
+        body.addProperty("ever_had_biopsy",   in.getBiopsyIndex());
+
+        /* Unknown hyperplasia (combo index 2) must be sent as 99 – just like
+         * the React code. */
+        if (in.getBiopsyIndex() == 0) {
+            body.addProperty("num_biopsy", 0);
+            body.addProperty("ihyp",       99);
+        } else {
+            body.addProperty("num_biopsy", in.getNumBiopsyIndex());
+            int ihyp = in.getIhypIndex();
+            if (ihyp == 2) ihyp = 99;
+            body.addProperty("ihyp", ihyp);
+        }
+
+        body.addProperty("first_deg_relatives", in.getRelativesIndex());
+        body.addProperty("race",                in.getRaceCode());
+
+        return body;
+    }
+
+    /* ───────────────── response side ───────────────── */
+
+    public RiskAssessment toDomain(RiskInput input, JsonObject raw) {
+        if (raw == null || raw.isJsonNull()) {
+            throw new IllegalStateException("API response is empty.");
+        }
+
+        JsonObject assessmentObj = objOrNull(raw.get("assessment"));
+        if (assessmentObj == null) {
+            throw new IllegalStateException("Response is missing the “assessment” object.");
+        }
+
+        JsonObject resultsObj = objOrNull(assessmentObj.get("results"));
+        if (resultsObj == null) {
+            throw new IllegalStateException("Response is missing the “results” object.");
+        }
+
+        /* Pull the *absolute* 5-year and lifetime risks – fall back to the
+         * older field names if necessary. */
+        double fiveYear = doubleOrNaN(resultsObj.get("five_year_abs"));
+        if (Double.isNaN(fiveYear)) {
+            fiveYear = doubleOrNaN(resultsObj.get("absolute_risk_5yr"));
+        }
+
+        double lifetime = doubleOrNaN(resultsObj.get("lifetime_abs"));
+        if (Double.isNaN(lifetime)) {
+            lifetime = doubleOrNaN(resultsObj.get("absolute_risk_lifetime"));
+        }
+
+        RiskResult rr = new RiskResult();
+        rr.setFiveYearRisk(fiveYear);
+        rr.setLifetimeRisk(lifetime);
+
+        RiskAssessment ra = new RiskAssessment();
+        ra.setInput(input);
+        ra.setResult(rr);
+        /* Keep an *independent* copy so callers can modify it safely. */
+        ra.setRawResults(resultsObj.deepCopy());
+
+        return ra;
+    }
+
+    /* ───────────────── helpers ───────────────── */
+
+    private JsonObject objOrNull(JsonElement el) {
+        return (el != null && el.isJsonObject()) ? el.getAsJsonObject() : null;
+    }
+
+    private double doubleOrNaN(JsonElement el) {
+        if (el == null || el.isJsonNull()) return Double.NaN;
+        try { return el.getAsDouble(); } catch (Exception ex) { return Double.NaN; }
+    }
+}
+"
+
+"RiskResult.java: "
+"package com.example.breastcancer;
+
+/** Holds the two risk values returned by the Flask API. */
+public class RiskResult {
+    private double fiveYearRisk;
+    private double lifetimeRisk;
+
+    public double getFiveYearRisk() { return fiveYearRisk; }
+    public void setFiveYearRisk(double fiveYearRisk) { this.fiveYearRisk = fiveYearRisk; }
+
+    public double getLifetimeRisk() { return lifetimeRisk; }
+    public void setLifetimeRisk(double lifetimeRisk) { this.lifetimeRisk = lifetimeRisk; }
+}"
+
+"RiskSubmitListener.java: "
+"package com.example.breastcancer;
+
+import com.google.gson.JsonObject;
+
+/**
+ * Callback used by RiskFormController → MainApp.
+ * Exactly the same signature as in your original working code.
+ */
+@FunctionalInterface
+public interface RiskSubmitListener {
+    void onRiskSuccess(JsonObject merged, String greeting);
+}"
+
+"combine.py: "
+"import os
+
+def print_folder(path, out_file, skip_name):
+    # List entries sorted so output is deterministic
+    entries = sorted(os.listdir(path))
+    
+    # First, write all files at this level
+    for name in entries:
+        # Skip the output file itself
+        if name == skip_name or name == 'WORKINGJAVACODEBASE.txt':
+            continue
+
+        full_path = os.path.join(path, name)
+        if os.path.isfile(full_path):
+            filename, ext = os.path.splitext(name)
+            ext = ext.lstrip('.')  # remove the leading dot
+            try:
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except Exception as e:
+                content = f"<Could not read file: {e}>"
+            print(f'"{filename}.{ext}: "', file=out_file)
+            print(f'"{content}"\n', file=out_file)
+    
+    # Then, recurse into each subdirectory
+    for name in entries:
+        if name == skip_name:
+            continue
+
+        full_path = os.path.join(path, name)
+        if os.path.isdir(full_path):
+            print(f'"{name} - Start :"', file=out_file)
+            print_folder(full_path, out_file, skip_name)
+            print(f'"{name} - End"\n', file=out_file)
+
+if __name__ == '__main__':
+    start_dir = os.getcwd()
+    output_filename = 'COMBINEDOUTPUTJAVA.txt'
+    output_path = os.path.join(start_dir, output_filename)
+    with open(output_path, 'w', encoding='utf-8') as out:
+        print_folder(start_dir, out, output_filename)
+    print(f"Directory listing written to {output_path}")"
+
+"breastcancer - End"
+
+"example - End"
+
+"com - End"
+
+"java - End"
+
+"resources - Start :"
+"logo.png: "
+"<Could not read file: 'utf-8' codec can't decode byte 0x89 in position 0: invalid start byte>"
+
+"resources - End"
+
+"main - End"
+
+"test - Start :"
+"java - Start :"
+"java - End"
+
+"test - End"
+
+"src - End"
+
+"target - Start :"
+"classes - Start :"
+"logo.png: "
+"<Could not read file: 'utf-8' codec can't decode byte 0x89 in position 0: invalid start byte>"
+
+"com - Start :"
+"example - Start :"
+"breastcancer - Start :"
+"ApiClient.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"ChatMessage.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"ChatPanel$1.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"ChatPanel$2.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"ChatPanel$3.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"ChatPanel.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"GreetingBuilder.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"HttpApiClient.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"MainApp$1.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"MainApp.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskAssessment.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskCalculationService.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskFormController$1.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskFormController.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskFormPanel$1.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskFormPanel$2.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskFormPanel.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskInput.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskResponseMapper.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskResult.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskSubmitListener.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"combine.py: "
+"import os
+
+def print_folder(path, out_file, skip_name):
+    # List entries sorted so output is deterministic
+    entries = sorted(os.listdir(path))
+    
+    # First, write all files at this level
+    for name in entries:
+        # Skip the output file itself
+        if name == skip_name or name == 'WORKINGJAVACODEBASE.txt':
+            continue
+
+        full_path = os.path.join(path, name)
+        if os.path.isfile(full_path):
+            filename, ext = os.path.splitext(name)
+            ext = ext.lstrip('.')  # remove the leading dot
+            try:
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except Exception as e:
+                content = f"<Could not read file: {e}>"
+            print(f'"{filename}.{ext}: "', file=out_file)
+            print(f'"{content}"\n', file=out_file)
+    
+    # Then, recurse into each subdirectory
+    for name in entries:
+        if name == skip_name:
+            continue
+
+        full_path = os.path.join(path, name)
+        if os.path.isdir(full_path):
+            print(f'"{name} - Start :"', file=out_file)
+            print_folder(full_path, out_file, skip_name)
+            print(f'"{name} - End"\n', file=out_file)
+
+if __name__ == '__main__':
+    start_dir = os.getcwd()
+    output_filename = 'COMBINEDOUTPUTJAVA.txt'
+    output_path = os.path.join(start_dir, output_filename)
+    with open(output_path, 'w', encoding='utf-8') as out:
+        print_folder(start_dir, out, output_filename)
+    print(f"Directory listing written to {output_path}")"
+
+"breastcancer - End"
+
+"example - End"
+
+"com - End"
+
+"classes - End"
+
+"test-classes - Start :"
+"test-classes - End"
+
+"target - End"
+

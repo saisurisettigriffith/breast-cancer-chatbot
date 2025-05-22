@@ -1,0 +1,698 @@
+"pom.xml: "
+"<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.example</groupId>
+  <artifactId>breast-cancer-chatbot</artifactId>
+  <version>1.0</version>
+
+  <properties>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.source>11</maven.compiler.source>
+    <maven.compiler.target>11</maven.compiler.target>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.google.code.gson</groupId>
+      <artifactId>gson</artifactId>
+      <version>2.10.1</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-assembly-plugin</artifactId>
+        <version>3.3.0</version>
+        <configuration>
+          <descriptorRefs>
+            <descriptorRef>jar-with-dependencies</descriptorRef>
+          </descriptorRefs>
+          <archive>
+            <manifest>
+              <mainClass>com.example.breastcancer.MainApp</mainClass>
+            </manifest>
+          </archive>
+        </configuration>
+        <executions>
+          <execution>
+            <id>make-assembly</id>
+            <phase>package</phase>
+            <goals><goal>single</goal></goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>"
+
+".vscode - Start :"
+"settings.json: "
+"{
+    "java.configuration.updateBuildConfiguration": "interactive"
+}"
+
+".vscode - End"
+
+"src - Start :"
+"main - Start :"
+"java - Start :"
+"com - Start :"
+"example - Start :"
+"breastcancer - Start :"
+"ApiClient.java: "
+"package com.example.breastcancer;
+
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.net.http.HttpResponse.BodyHandlers;
+import java.nio.charset.StandardCharsets;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
+
+public class ApiClient {
+    public static final String BASE = System.getenv().getOrDefault(
+            "REACT_APP_API_BASE_URL",
+            "https://breast-cancer-flask-455419.ew.r.appspot.com");
+
+    public final HttpClient client = HttpClient.newHttpClient();
+    public final Gson gson = new Gson();
+
+    public JsonObject postRisk(JsonObject body) throws Exception {
+        return post("/api/risk", body);
+    }
+
+    public JsonObject postChat(JsonObject body) throws Exception {
+        return post("/api/chat", body);
+    }
+
+    public JsonObject post(String path, JsonElement body) throws Exception {
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(BASE + path))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body), StandardCharsets.UTF_8))
+                .build();
+        HttpResponse<String> res = client.send(req, BodyHandlers.ofString());
+        if (res.statusCode() < 200 || res.statusCode() >= 300) {
+            throw new RuntimeException("Server responded: " + res.statusCode());
+        }
+        return JsonParser.parseString(res.body()).getAsJsonObject();
+    }
+}"
+
+"ChatPanel.java: "
+"package com.example.breastcancer;
+
+import java.awt.BorderLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.List;
+
+import javax.swing.BorderFactory;
+import javax.swing.JButton;
+import javax.swing.JPanel;
+import javax.swing.JScrollPane;
+import javax.swing.JTextArea;
+import javax.swing.JTextField;
+import javax.swing.SwingWorker;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonObject;
+
+public class ChatPanel extends JPanel {
+    public final ApiClient api;
+    public final String sessionId;
+    public final List<JsonObject> riskCache;
+    public final JTextArea chatArea = new JTextArea();
+    public final JTextField inputField = new JTextField();
+    public final JButton sendBtn = new JButton("Send");
+    public final Gson gson = new Gson();
+
+    public ChatPanel(ApiClient api, String sessionId, List<JsonObject> riskCache, String greeting) {
+        this.api = api;
+        this.sessionId = sessionId;
+        this.riskCache = riskCache;
+        build(greeting);
+    }
+
+    public void build(String greeting) {
+        setLayout(new BorderLayout(10, 10));
+        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+
+        chatArea.setEditable(false);
+        chatArea.setLineWrap(true);
+        chatArea.setWrapStyleWord(true);
+        JScrollPane scroll = new JScrollPane(chatArea);
+        add(scroll, BorderLayout.CENTER);
+
+        JPanel bottom = new JPanel(new BorderLayout(5, 5));
+        bottom.add(inputField, BorderLayout.CENTER);
+        bottom.add(sendBtn, BorderLayout.EAST);
+        add(bottom, BorderLayout.SOUTH);
+
+        appendAssistant(greeting);
+
+        sendBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                submit();
+            }
+        });
+        inputField.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                submit();
+            }
+        });
+    }
+
+    public void submit() {
+        String msg = inputField.getText().trim();
+        if (msg.isEmpty()) {
+            return;
+        }
+        appendUser(msg);
+        inputField.setText("");
+        sendBtn.setEnabled(false);
+
+        SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
+            public String answer;
+            public Exception err;
+
+            @Override
+            protected Void doInBackground() {
+                try {
+                    JsonObject body = new JsonObject();
+                    body.addProperty("session_id", sessionId);
+                    body.add("riskData", gson.toJsonTree(riskCache));
+                    body.addProperty("input", msg);
+                    JsonObject res = api.postChat(body);
+                    answer = res.get("answer").getAsString();
+                } catch (Exception ex) {
+                    err = ex;
+                    ex.printStackTrace();
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                sendBtn.setEnabled(true);
+                if (err != null) {
+                    appendAssistant("Error: " + err.getMessage());
+                } else {
+                    appendAssistant(answer);
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    public void appendUser(String msg) {
+        chatArea.append("You: " + msg + "\n");
+    }
+
+    public void appendAssistant(String msg) {
+        chatArea.append("Bot: " + msg + "\n\n");
+    }
+}"
+
+"MainApp.java: "
+"package com.example.breastcancer;
+
+import java.awt.CardLayout;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
+
+import javax.swing.JFrame;
+import javax.swing.JPanel;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
+
+import com.google.gson.JsonObject;
+
+public class MainApp extends JFrame implements RiskSubmitListener {
+    public final CardLayout cards = new CardLayout();
+    public final JPanel root = new JPanel(cards);
+    public final ApiClient api = new ApiClient();
+    public final List<JsonObject> riskCache = new ArrayList<>();
+    public final String sessionId = UUID.randomUUID().toString().substring(0, 8);
+
+    public MainApp() {
+        super("Breast Cancer ChatBot");
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+        setSize(820, 640);
+        setLocationRelativeTo(null);
+
+        root.add(new RiskFormPanel(this), "form");
+        add(root);
+    }
+
+    @Override
+    public void onRiskSuccess(JsonObject merged, String greeting) {
+        riskCache.add(merged);
+        ChatPanel chat = new ChatPanel(api, sessionId, riskCache, greeting);
+        root.add(chat, "chat");
+        cards.show(root, "chat");
+    }
+
+    public static void main(String[] args) {
+        try {
+            UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        } catch (Exception ignored) {}
+        SwingUtilities.invokeLater(new Runnable() {
+            @Override
+            public void run() {
+                new MainApp().setVisible(true);
+            }
+        });
+    }
+}"
+
+"RiskFormPanel.java: "
+"package com.example.breastcancer;
+
+import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.util.Map;
+
+import javax.swing.BorderFactory;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JSpinner;
+import javax.swing.SpinnerNumberModel;
+import javax.swing.SwingConstants;
+import javax.swing.SwingWorker;
+
+import com.google.gson.Gson;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+
+public class RiskFormPanel extends JPanel {
+    public static final int[] RACE_VALUES = { 1, 2, 3, 7, 8, 9, 10, 11, 12 };
+
+    public final ApiClient api = new ApiClient();
+    public final RiskSubmitListener listener;
+    public final Gson gson = new Gson();
+
+    public JSpinner ageSpinner;
+    public JComboBox<String> menarchBox;
+    public JComboBox<String> liveBirthBox;
+    public JComboBox<String> biopsyBox;
+    public JComboBox<String> numBiopsyBox;
+    public JComboBox<String> ihypBox;
+    public JComboBox<String> relativesBox;
+    public JComboBox<String> raceBox;
+    public JPanel biopsyDetails;
+    public JButton submitBtn;
+    public JLabel errorLabel;
+
+    public RiskFormPanel(RiskSubmitListener listener) {
+        this.listener = listener;
+        build();
+    }
+
+    public void build() {
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
+
+        add(centeredLabel("Breast Cancer Risk Parameters", 18f));
+
+        ageSpinner = new JSpinner(new SpinnerNumberModel(48, 35, 85, 1));
+        add(labeled("Woman’s current age (35–85):", ageSpinner));
+
+        menarchBox = new JComboBox<>(new String[]{
+            "≥ 14 yrs / Unknown", "12 – 13 yrs", "7 – 11 yrs"
+        });
+        add(labeled("Age at first period:", menarchBox));
+
+        liveBirthBox = new JComboBox<>(new String[]{
+            "Unknown or < 20 yrs", "20 – 24 yrs", "25 – 29 yrs or No births", "≥ 30 yrs"
+        });
+        add(labeled("Age at first live birth:", liveBirthBox));
+
+        biopsyBox = new JComboBox<>(new String[]{"No / Unknown", "Yes"});
+        add(labeled("Ever had biopsy?", biopsyBox));
+
+        biopsyDetails = new JPanel();
+        biopsyDetails.setLayout(new BoxLayout(biopsyDetails, BoxLayout.Y_AXIS));
+        numBiopsyBox = new JComboBox<>(new String[]{
+            "0 biopsies", "1 biopsy or unknown count", "> 1 biopsy"
+        });
+        ihypBox = new JComboBox<>(new String[]{
+            "No atypical hyperplasia", "Yes", "Unknown / Not applicable"
+        });
+        biopsyDetails.add(labeled("Number of biopsies:", numBiopsyBox));
+        biopsyDetails.add(labeled("Atypical hyperplasia?", ihypBox));
+        add(biopsyDetails);
+        biopsyDetails.setVisible(false);
+        biopsyBox.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                biopsyDetails.setVisible(biopsyBox.getSelectedIndex() == 1);
+            }
+        });
+
+        relativesBox = new JComboBox<>(new String[]{
+            "0 relatives / Unknown", "1", "> 1"
+        });
+        add(labeled("First-degree relatives with breast cancer:", relativesBox));
+
+        raceBox = new JComboBox<>(new String[]{
+            "White / Unknown / American-Indian", "African-American", "Hispanic",
+            "Chinese", "Japanese", "Filipino", "Hawaiian",
+            "Other Pacific Islander", "Other Asian-American"
+        });
+        add(labeled("Race / Ethnicity:", raceBox));
+
+        errorLabel = new JLabel(" ");
+        errorLabel.setForeground(Color.RED);
+        add(errorLabel);
+
+        submitBtn = new JButton("Calculate Risk");
+        submitBtn.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                submit();
+            }
+        });
+        add(Box.createRigidArea(new Dimension(0, 10)));
+        add(submitBtn);
+    }
+
+    public JLabel centeredLabel(String text, float size) {
+        JLabel lbl = new JLabel(text, SwingConstants.CENTER);
+        lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
+        lbl.setFont(lbl.getFont().deriveFont(Font.BOLD, size));
+        lbl.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
+        return lbl;
+    }
+
+    public JPanel labeled(String label, JComponent comp) {
+        JPanel p = new JPanel(new BorderLayout());
+        p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        JLabel l = new JLabel(label);
+        l.setPreferredSize(new Dimension(280, 28));
+        p.add(l, BorderLayout.WEST);
+        p.add(comp, BorderLayout.CENTER);
+        return p;
+    }
+
+    public void submit() {
+        int age = (int) ageSpinner.getValue();
+        if (age < 35 || age > 85) {
+            errorLabel.setText("Age must be between 35 and 85.");
+            return;
+        }
+        errorLabel.setText("Calculating…");
+        submitBtn.setEnabled(false);
+
+        final JsonObject body = new JsonObject();
+        body.addProperty("age", age);
+        body.addProperty("menarch_age", menarchBox.getSelectedIndex());
+        body.addProperty("live_birth_age", liveBirthBox.getSelectedIndex());
+
+        int biopsy = biopsyBox.getSelectedIndex();
+        body.addProperty("ever_had_biopsy", biopsy);
+        if (biopsy == 0) {
+            body.addProperty("num_biopsy", 0);
+            body.addProperty("ihyp", 99);
+        } else {
+            body.addProperty("num_biopsy", numBiopsyBox.getSelectedIndex());
+            int ihypVal = ihypBox.getSelectedIndex();
+            if (ihypVal == 2) ihypVal = 99;
+            body.addProperty("ihyp", ihypVal);
+        }
+
+        body.addProperty("first_deg_relatives", relativesBox.getSelectedIndex());
+        body.addProperty("race", RACE_VALUES[raceBox.getSelectedIndex()]);
+
+        new SwingWorker<Void, Void>() {
+            public JsonObject merged;
+            public String greeting;
+            public Exception err;
+
+            @Override
+            protected Void doInBackground() {
+                try {
+                    JsonObject res = api.postRisk(body);
+                    JsonObject assessment = res.getAsJsonObject("assessment");
+                    JsonObject results = assessment.getAsJsonObject("results");
+
+                    merged = new JsonObject();
+                    for (Map.Entry<String, JsonElement> e : body.entrySet()) {
+                        merged.add(e.getKey(), e.getValue());
+                    }
+                    for (Map.Entry<String, JsonElement> e : results.entrySet()) {
+                        merged.add(e.getKey(), e.getValue());
+                    }
+
+                    StringBuilder inputSummary = new StringBuilder();
+                    for (Map.Entry<String, JsonElement> e : body.entrySet()) {
+                        inputSummary.append(e.getKey())
+                                    .append(": ")
+                                    .append(e.getValue())
+                                    .append(", ");
+                    }
+                    if (inputSummary.length() > 2) {
+                        inputSummary.setLength(inputSummary.length() - 2);
+                    }
+
+                    StringBuilder predictionSummary = new StringBuilder();
+                    for (Map.Entry<String, JsonElement> e : results.entrySet()) {
+                        predictionSummary.append(e.getKey())
+                                          .append(": ")
+                                          .append(e.getValue())
+                                          .append(", ");
+                    }
+                    if (predictionSummary.length() > 2) {
+                        predictionSummary.setLength(predictionSummary.length() - 2);
+                    }
+
+                    greeting = "Hello! I’m your Breast Cancer ChatBot. I’ll be assisting you based on your health information and the GAIL model predictions."
+                             + "• Your inputs: " + inputSummary + "."
+                             + "• GAIL predictions: " + predictionSummary + "."
+                             + "All responses will be based on your provided health information and predictions from the GAIL model.";
+                } catch (Exception ex) {
+                    err = ex;
+                    ex.printStackTrace();
+                }
+                return null;
+            }
+
+            @Override
+            protected void done() {
+                submitBtn.setEnabled(true);
+                if (err != null) {
+                    errorLabel.setText("Error: " + err.getMessage());
+                } else {
+                    listener.onRiskSuccess(merged, greeting);
+                }
+            }
+        }.execute();
+    }
+}"
+
+"RiskSubmitListener.java: "
+"package com.example.breastcancer;
+
+import com.google.gson.JsonObject;
+
+@FunctionalInterface
+public interface RiskSubmitListener {
+    void onRiskSuccess(JsonObject merged, String greeting);
+}"
+
+"combine.py: "
+"import os
+
+def print_folder(path, out_file, skip_name):
+    # List entries sorted so output is deterministic
+    entries = sorted(os.listdir(path))
+    
+    # First, write all files at this level
+    for name in entries:
+        # Skip the output file itself
+        if name == skip_name:
+            continue
+
+        full_path = os.path.join(path, name)
+        if os.path.isfile(full_path):
+            filename, ext = os.path.splitext(name)
+            ext = ext.lstrip('.')  # remove the leading dot
+            try:
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except Exception as e:
+                content = f"<Could not read file: {e}>"
+            print(f'"{filename}.{ext}: "', file=out_file)
+            print(f'"{content}"\n', file=out_file)
+    
+    # Then, recurse into each subdirectory
+    for name in entries:
+        if name == skip_name:
+            continue
+
+        full_path = os.path.join(path, name)
+        if os.path.isdir(full_path):
+            print(f'"{name} - Start :"', file=out_file)
+            print_folder(full_path, out_file, skip_name)
+            print(f'"{name} - End"\n', file=out_file)
+
+if __name__ == '__main__':
+    start_dir = os.getcwd()
+    output_filename = 'CODEBASE.txt'
+    output_path = os.path.join(start_dir, output_filename)
+    with open(output_path, 'w', encoding='utf-8') as out:
+        print_folder(start_dir, out, output_filename)
+    print(f"Directory listing written to {output_path}")"
+
+"breastcancer - End"
+
+"example - End"
+
+"com - End"
+
+"java - End"
+
+"resources - Start :"
+"logo.png: "
+"<Could not read file: 'utf-8' codec can't decode byte 0x89 in position 0: invalid start byte>"
+
+"resources - End"
+
+"main - End"
+
+"test - Start :"
+"java - Start :"
+"java - End"
+
+"test - End"
+
+"src - End"
+
+"target - Start :"
+"classes - Start :"
+"logo.png: "
+"<Could not read file: 'utf-8' codec can't decode byte 0x89 in position 0: invalid start byte>"
+
+"com - Start :"
+"example - Start :"
+"breastcancer - Start :"
+"ApiClient.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"ChatPanel$1.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"ChatPanel$2.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"ChatPanel$3.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"ChatPanel.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"MainApp$1.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"MainApp.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskFormPanel$1.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskFormPanel$2.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskFormPanel$3.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskFormPanel.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"RiskSubmitListener.class: "
+"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
+
+"combine.py: "
+"import os
+
+def print_folder(path, out_file, skip_name):
+    # List entries sorted so output is deterministic
+    entries = sorted(os.listdir(path))
+    
+    # First, write all files at this level
+    for name in entries:
+        # Skip the output file itself
+        if name == skip_name:
+            continue
+
+        full_path = os.path.join(path, name)
+        if os.path.isfile(full_path):
+            filename, ext = os.path.splitext(name)
+            ext = ext.lstrip('.')  # remove the leading dot
+            try:
+                with open(full_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+            except Exception as e:
+                content = f"<Could not read file: {e}>"
+            print(f'"{filename}.{ext}: "', file=out_file)
+            print(f'"{content}"\n', file=out_file)
+    
+    # Then, recurse into each subdirectory
+    for name in entries:
+        if name == skip_name:
+            continue
+
+        full_path = os.path.join(path, name)
+        if os.path.isdir(full_path):
+            print(f'"{name} - Start :"', file=out_file)
+            print_folder(full_path, out_file, skip_name)
+            print(f'"{name} - End"\n', file=out_file)
+
+if __name__ == '__main__':
+    start_dir = os.getcwd()
+    output_filename = 'CODEBASE.txt'
+    output_path = os.path.join(start_dir, output_filename)
+    with open(output_path, 'w', encoding='utf-8') as out:
+        print_folder(start_dir, out, output_filename)
+    print(f"Directory listing written to {output_path}")"
+
+"breastcancer - End"
+
+"example - End"
+
+"com - End"
+
+"classes - End"
+
+"test-classes - Start :"
+"test-classes - End"
+
+"target - End"

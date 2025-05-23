@@ -1,118 +1,13 @@
-"pom.xml: "
-"<?xml version="1.0" encoding="UTF-8"?>
-<project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
-                             http://maven.apache.org/xsd/maven-4.0.0.xsd">
-  <modelVersion>4.0.0</modelVersion>
-
-  <groupId>com.example</groupId>
-  <artifactId>breast-cancer-chatbot</artifactId>
-  <version>2.0</version>
-
-  <properties>
-    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <maven.compiler.source>11</maven.compiler.source>
-    <maven.compiler.target>11</maven.compiler.target>
-  </properties>
-
-  <dependencies>
-    <!-- JSON -->
-    <dependency>
-      <groupId>com.google.code.gson</groupId>
-      <artifactId>gson</artifactId>
-      <version>2.10.1</version>
-    </dependency>
-  </dependencies>
-
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-compiler-plugin</artifactId>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-assembly-plugin</artifactId>
-        <version>3.3.0</version>
-        <configuration>
-          <descriptorRefs>
-            <descriptorRef>jar-with-dependencies</descriptorRef>
-          </descriptorRefs>
-          <archive>
-            <manifest>
-              <mainClass>com.example.breastcancer.MainApp</mainClass>
-            </manifest>
-          </archive>
-        </configuration>
-        <executions>
-          <execution>
-            <id>make-assembly</id>
-            <phase>package</phase>
-            <goals>
-              <goal>single</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
-    </plugins>
-  </build>
-</project>"
-
-".vscode - Start :"
-"settings.json: "
-"{
-    "java.configuration.updateBuildConfiguration": "interactive"
-}"
-
-".vscode - End"
-
-"src - Start :"
-"main - Start :"
-"java - Start :"
-"com - Start :"
-"example - Start :"
-"breastcancer - Start :"
-"ApiClient.java: "
+"ChatController.java: "
 "package com.example.breastcancer;
 
-import com.google.gson.JsonObject;
-
-/**
- * Lean interface – higher‑level code depends on this abstraction rather than
- * on java.net.http.  We add two default helpers so callers can still use the
- * familiar postRisk / postChat methods exactly like in the original code.
- */
-public interface ApiClient {
-
-    /** Low‑level generic POST (path starts with "/api/"). */
-    JsonObject post(String path, JsonObject body) throws Exception;
-
-    /* ───────────────── convenience helpers ───────────────── */
-
-    default JsonObject postRisk(JsonObject body) throws Exception {
-        return post("/api/risk", body);
+public class ChatController {
+    private final MainApp mainApp;
+    private final Session session;
+    public ChatController(Session session, MainApp mainApp) {
+        this.mainApp = mainApp;
+        this.session = session;
     }
-
-    default JsonObject postChat(JsonObject body) throws Exception {
-        return post("/api/chat", body);
-    }
-}"
-
-"ChatMessage.java: "
-"// ChatMessage.java
-package com.example.breastcancer;
-
-public final class ChatMessage {
-    private final String sender;
-    private final String text;
-
-    public ChatMessage(String sender, String text) {
-        this.sender = sender;
-        this.text = text;
-    }
-    public String getSender() { return sender; }
-    public String getText() { return text; }
 }"
 
 "ChatPanel.java: "
@@ -128,7 +23,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
-
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -137,17 +31,18 @@ import com.google.gson.JsonObject;
  */
 public class ChatPanel extends JPanel {
 
-    private final ApiClient api;
+    private final HttpApiClient api;
     private final String    sessionId;
     private final List<JsonObject> riskCache;
 
     private final JTextArea  chatArea  = new JTextArea();
     private final JTextField inputFld  = new JTextField();
     private final JButton    sendBtn   = new JButton("Send");
+    private final JButton    gailBtn = new JButton("Refill Form");
 
     private final Gson gson = new Gson();
 
-    public ChatPanel(ApiClient api, String sessionId, List<JsonObject> riskCache, String greeting) {
+    public ChatPanel(HttpApiClient api, String sessionId, List<JsonObject> riskCache, String greeting) {
         this.api       = api;
         this.sessionId = sessionId;
         this.riskCache = riskCache;
@@ -177,6 +72,11 @@ public class ChatPanel extends JPanel {
         });
         inputFld.addActionListener(new java.awt.event.ActionListener() {
             @Override public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+        });
+        gailBtn.addActionListener(new java.awt.event.ActionListener() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                
+            }
         });
     }
 
@@ -211,43 +111,41 @@ public class ChatPanel extends JPanel {
     private void appendAssistant(String txt) { chatArea.append("Bot: " + txt + "\n\n"); }
 }"
 
-"GreetingBuilder.java: "
+"Credentials.java: "
 "package com.example.breastcancer;
+/**
+ * Credentials class manages Firebase Admin SDK initialization
+ * and provides methods for validating user credentials
+ * against Firebase Authentication via the REST API.
+ */
+public class Credentials {
+    public boolean isValidFormat = false;
+    private String username;
+    private String password;
 
-
-/** Builds the long greeting paragraph exactly like the original code did. */
-public class GreetingBuilder {
-
-    public String build(RiskAssessment ra) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("Hello! I’m your Breast Cancer ChatBot. I’ll be assisting you based on your health information and the GAIL model predictions. ");
-
-        sb.append("• Your inputs: ");
-        sb.append(inputSummary(ra.getInput()));
-        sb.append(". • GAIL predictions: ");
-        sb.append(resultSummary(ra.getResult()));
-        sb.append(". All responses will be based on your provided health information and predictions from the GAIL model.");
-        return sb.toString();
+    public Credentials(String username, String password) {
+        this.username = username;
+        this.password = password;
+        this.isValidFormat = checkValidityRegEx();
     }
 
-    private String inputSummary(RiskInput in) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("age=").append(in.getAge()).append(", ");
-        sb.append("menarch=").append(in.getMenarchAgeIndex()).append(", ");
-        sb.append("liveBirth=").append(in.getLiveBirthAgeIndex()).append(", ");
-        sb.append("biopsy=").append(in.getBiopsyIndex()).append(", ");
-        sb.append("numBiopsy=").append(in.getNumBiopsyIndex()).append(", ");
-        sb.append("ihyp=").append(in.getIhypIndex()).append(", ");
-        sb.append("relatives=").append(in.getRelativesIndex()).append(", ");
-        sb.append("race=").append(in.getRaceCode());
-        return sb.toString();
+    public boolean checkValidityRegEx() {
+        String emailPattern = "^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$";
+        String passwordPattern = ".{6,}";
+        boolean emailMatches = this.username.matches(emailPattern);
+        boolean passwordMatches = this.password.matches(passwordPattern);
+        if (emailMatches && passwordMatches) {
+            return true;
+        }
+        return false;
     }
 
-    private String resultSummary(RiskResult r) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("5‑year=" ).append(r.getFiveYearRisk()).append(", ");
-        sb.append("lifetime=").append(r.getLifetimeRisk());
-        return sb.toString();
+    public String getUsername() {
+        return username;
+    }
+
+    public String getPassword() {
+        return password;
     }
 }"
 
@@ -264,40 +162,165 @@ import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-/** Concrete implementation that wraps java.net.http. */
-public class HttpApiClient implements ApiClient {
+/**
+ * Concrete HTTP client for your Flask back-end.
+ * Call postRisk(...) and postChat(...) directly.
+ */
+public class HttpApiClient {
 
-    private static final String BASE = System.getenv().getOrDefault(
-            "REACT_APP_API_BASE_URL",
-            "https://breast-cancer-flask-455419.ew.r.appspot.com");
+    /** ← same hard-coded URL you’ve been using */
+    private static final String BASE =
+        "https://breast-cancer-flask-455419.ew.r.appspot.com";
 
     private final HttpClient client = HttpClient.newHttpClient();
     private final Gson       gson   = new Gson();
 
-    @Override
-    public JsonObject post(String path, JsonObject body) throws Exception {
+    /** Send the risk-calculation request and return the parsed JSON. */
+    public JsonObject postRisk(JsonObject body) throws Exception {
+        return post("/api/risk", body);
+    }
+
+    /** Send the chat request and return the parsed JSON. */
+    public JsonObject postChat(JsonObject body) throws Exception {
+        return post("/api/chat", body);
+    }
+
+    /** Internal helper—no need to change this. */
+    private JsonObject post(String path, JsonObject body) throws Exception {
         HttpRequest req = HttpRequest.newBuilder()
-                .uri(URI.create(BASE + path))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(gson.toJson(body), StandardCharsets.UTF_8))
-                .build();
+            .uri(URI.create(BASE + path))
+            .header("Content-Type", "application/json")
+            .POST(HttpRequest.BodyPublishers.ofString(
+                gson.toJson(body), StandardCharsets.UTF_8))
+            .build();
 
         HttpResponse<String> res = client.send(req, HttpResponse.BodyHandlers.ofString());
         if (res.statusCode() < 200 || res.statusCode() >= 300) {
-            throw new RuntimeException("Server responded: " + res.statusCode());
+            throw new RuntimeException(
+                "Server responded " + res.statusCode() + ": " + res.body());
         }
         return JsonParser.parseString(res.body()).getAsJsonObject();
     }
-}"
+}
+"
+
+"LoginController.java: "
+"package com.example.breastcancer;
+
+/**
+ * Mediates between LoginPanel and Session.
+ */
+public class LoginController {
+
+    private final Session session;
+    private final MainApp mainApp;
+
+    public LoginController(Session session, MainApp mainApp) {
+        this.session = session;
+        this.mainApp = mainApp;
+    }
+
+    /** @return error message (null if login succeeded). */
+    public String onLogin(String email, String password) {
+        Credentials creds = new Credentials(email, password);
+        if (!creds.isValidFormat) {
+            return "Enter a valid e-mail / password.";
+        }
+        if (session.login(creds)) {
+            mainApp.onLoginSuccess("Welcome back! Let’s continue.");
+            return null;
+        }
+        return "Wrong credentials or network error.";
+    }
+
+    public void goToRegister() {
+        mainApp.showRegisterPanel();
+    }
+}
+"
+
+"LoginPanel.java: "
+"package com.example.breastcancer;
+
+import java.awt.Component;
+import java.awt.Dimension;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JTextField;
+
+/**
+ * Sign-in form mirroring RegisterPanel.
+ */
+public class LoginPanel extends JPanel {
+
+    private final LoginController controller;
+
+    private final JTextField     emailFld  = new JTextField();
+    private final JPasswordField passFld   = new JPasswordField();
+    private final JButton        loginBtn  = new JButton("Login");
+    private final JButton        registerBtn = new JButton("Need an account? Register");
+    private final JLabel         msgLabel  = new JLabel(" ");
+
+    public LoginPanel(LoginController c) {
+        controller = c;
+        build();
+    }
+
+    private void build() {
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        add(centered(new JLabel("Sign-in")));
+        add(Box.createRigidArea(new Dimension(0, 10)));
+
+        add(new JLabel("E-mail:"));
+        add(emailFld);
+        add(Box.createRigidArea(new Dimension(0, 10)));
+
+        add(new JLabel("Password:"));
+        add(passFld);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+
+        add(loginBtn);
+        add(Box.createRigidArea(new Dimension(0, 5)));
+        add(registerBtn);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+        add(msgLabel);
+
+        /* listeners */
+        loginBtn.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+        });
+        registerBtn.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) { controller.goToRegister(); }
+        });
+    }
+
+    private void submit() {
+        String email = emailFld.getText().trim();
+        String pass  = new String(passFld.getPassword());
+        String err   = controller.onLogin(email, pass);
+        if (err != null) {
+            msgLabel.setText(err);
+        }
+    }
+
+    private Component centered(Component c) {
+        ((JComponent) c).setAlignmentX(Component.CENTER_ALIGNMENT);
+        return c;
+    }
+}
+"
 
 "MainApp.java: "
 "package com.example.breastcancer;
 
 import java.awt.CardLayout;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -306,180 +329,335 @@ import javax.swing.UIManager;
 import com.google.gson.JsonObject;
 
 /**
- * Application entry‑point (single‑package version).
+ * Application entry-point and simple screen-flow manager.
+ * All screens live inside one CardLayout so we can jump
+ * between them with cards.show(root, "name").
  */
-public class MainApp extends JFrame implements RiskSubmitListener {
+public class MainApp extends JFrame {
 
+    /* ---------- navigation ---------- */
     private final CardLayout cards = new CardLayout();
     private final JPanel     root  = new JPanel(cards);
 
-    /* ───────── dependencies ───────── */
-    private final ApiClient              api         = new HttpApiClient();
-    private final RiskCalculationService calcService = new RiskCalculationService(api);
+    /* ---------- back-end / state ---------- */
+    private final Session                 session   = new Session();
+    private final HttpApiClient           api       = new HttpApiClient();
+    private final RiskCalculationService  service   = new RiskCalculationService(api);
 
-    /* ───────── session state ───────── */
-    private final List<JsonObject> riskCache = new ArrayList<>();
-    private final String           sessionId = UUID.randomUUID().toString().substring(0, 8);
+    /* ---------- UI screens ---------- */
+    private RegisterPanel registerPanel;
+    private LoginPanel    loginPanel;
+    private RiskFormPanel riskFormPanel;
+    private ChatPanel     chatPanel;
+
+    /* ---------- controllers ---------- */
+    private RegisterController registerController;
+    private LoginController    loginController;
+    private RiskFormController riskFormController;
+    private ChatController     chatController;
+
+    /* ---------- misc ---------- */
+    private final String sessionId =
+        UUID.randomUUID().toString().substring(0, 8);
 
     public MainApp() {
-        super("Breast Cancer ChatBot");
+        super("Breast-Cancer ChatBot");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
         setSize(820, 640);
         setLocationRelativeTo(null);
 
-        RiskFormController formController = new RiskFormController(calcService, this);
-        root.add(new RiskFormPanel(formController), "form");
+        buildScreens();
         add(root);
+        cards.show(root, "register");          // first screen
     }
 
-    /** Callback invoked by RiskFormController after successful calculation. */
-    @Override
+    /* ======================================================================
+     *  Build screens + wire controllers
+     * ====================================================================== */
+    private void buildScreens() {
+        /* ---- register / login ---- */
+        registerController = new RegisterController(session, this);
+        registerPanel      = new RegisterPanel(registerController);
+        root.add(registerPanel, "register");
+
+        loginController    = new LoginController(session, this);
+        loginPanel         = new LoginPanel(loginController);
+        root.add(loginPanel, "login");
+
+        /* ---- risk form ---- */
+        riskFormController = new RiskFormController(service, session, this);
+        riskFormPanel      = new RiskFormPanel(riskFormController, session);
+        root.add(riskFormPanel, "form");
+    }
+
+    /* ======================================================================
+     *  Navigation helpers – invoked by controllers
+     * ====================================================================== */
+    public void showLoginPanel()     { cards.show(root, "login");     }
+    public void showRegisterPanel()  { cards.show(root, "register");  }
+
+    /** After successful sign-in. */
+    public void onLoginSuccess(String greeting) {
+        if (!session.getRiskCache().isEmpty()) {
+            showChat(session.getRiskCache(), greeting);   // user already has predictions
+        } else {
+            cards.show(root, "form");                     // need parameters first
+        }
+    }
+
+    /** After /api/risk completes. */
     public void onRiskSuccess(JsonObject merged, String greeting) {
-        riskCache.add(merged);
-        ChatPanel chat = new ChatPanel(api, sessionId, riskCache, greeting);
-        root.add(chat, "chat");
+        session.addRisk(merged);
+        showChat(session.getRiskCache(), greeting);
+    }
+
+    /* ------------------------------------------------------------------ */
+    private void showChat(List<JsonObject> riskCache, String greeting) {
+        chatController = new ChatController(session, this);
+        chatPanel      = new ChatPanel(api, sessionId, riskCache, greeting);
+        root.add(chatPanel, "chat");
         cards.show(root, "chat");
     }
 
+    /* ====================================================================== */
     public static void main(String[] args) throws Exception {
-        UIManager.setLookAndFeel(UIManager.getSystemLookAndFeelClassName());
+        UIManager.setLookAndFeel(
+            UIManager.getSystemLookAndFeelClassName()
+        );
         SwingUtilities.invokeLater(new Runnable() {
-            @Override public void run() { new MainApp().setVisible(true); }
+            public void run() { new MainApp().setVisible(true); }
         });
     }
-}"
+}
+"
+
+"RegisterController.java: "
+"package com.example.breastcancer;
+
+/**
+ * Mediates between RegisterPanel and Session.
+ */
+public class RegisterController {
+
+    private final Session session;
+    private final MainApp mainApp;
+
+    public RegisterController(Session session, MainApp mainApp) {
+        this.session = session;
+        this.mainApp = mainApp;
+    }
+
+    /** @return status message to show below the form. */
+    public String onRegister(String email, String password) {
+        Credentials creds = new Credentials(email, password);
+        if (!creds.isValidFormat) {
+            return "Enter a valid e-mail and 6-plus-character password.";
+        }
+        if (session.register(creds)) {
+            mainApp.showLoginPanel();
+            return "Account created – please sign-in.";
+        }
+        return "Registration failed – try again.";
+    }
+
+    public void goToLogin() {
+        mainApp.showLoginPanel();
+    }
+}
+"
+
+"RegisterPanel.java: "
+"package com.example.breastcancer;
+
+import java.awt.Component;
+import java.awt.Dimension;
+import javax.swing.Box;
+import javax.swing.BoxLayout;
+import javax.swing.JButton;
+import javax.swing.JComponent;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JTextField;
+
+/**
+ * Very small form: e-mail + password + two buttons.
+ * Uses anonymous inner classes (no lambdas) to stay beginner-friendly.
+ */
+public class RegisterPanel extends JPanel {
+
+    private final RegisterController controller;
+
+    private final JTextField     emailFld   = new JTextField();
+    private final JPasswordField passFld    = new JPasswordField();
+    private final JButton        registerBtn= new JButton("Register");
+    private final JButton        loginBtn   = new JButton("Already registered? Sign-in");
+    private final JLabel         msgLabel   = new JLabel(" ");
+
+    public RegisterPanel(RegisterController c) {
+        controller = c;
+        build();
+    }
+
+    private void build() {
+        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
+        add(centered(new JLabel("Create your account")));
+        add(Box.createRigidArea(new Dimension(0, 10)));
+
+        add(new JLabel("E-mail:"));
+        add(emailFld);
+        add(Box.createRigidArea(new Dimension(0, 10)));
+
+        add(new JLabel("Password:"));
+        add(passFld);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+
+        add(registerBtn);
+        add(Box.createRigidArea(new Dimension(0, 5)));
+        add(loginBtn);
+        add(Box.createRigidArea(new Dimension(0, 15)));
+        add(msgLabel);
+
+        /* listeners */
+        registerBtn.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+        });
+        loginBtn.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent e) { controller.goToLogin(); }
+        });
+    }
+
+    private void submit() {
+        String email = emailFld.getText().trim();
+        String pass  = new String(passFld.getPassword());
+        String msg   = controller.onRegister(email, pass);
+        msgLabel.setText(msg);
+    }
+
+    private Component centered(Component c) {
+        ((JComponent) c).setAlignmentX(Component.CENTER_ALIGNMENT);
+        return c;
+    }
+}
+"
 
 "RiskAssessment.java: "
 "package com.example.breastcancer;
 
 import com.google.gson.JsonObject;
 
-/**
- * Bundles the user input, the parsed numerical results *and* the raw “results”
- * object that comes back from the Flask /api/risk route.  Keeping the raw JSON
- * lets us flatten everything – exactly like the original React code did –
- * without having to predict which fields may appear in the future.
- */
+/** Bundle of (input + prediction + raw JSON copy) passed around the UI. */
 public class RiskAssessment {
+    private RiskInput   input;
+    private RiskResult  result;
+    private JsonObject  rawResults;
 
-    private RiskInput  input;
-    private RiskResult result;
-    private JsonObject rawResults;   // ← new
+    public RiskInput  getInput()                { return input; }
+    public void       setInput(RiskInput i)     { input = i; }
 
-    /* ───── generated getters / setters ───── */
+    public RiskResult getResult()               { return result; }
+    public void       setResult(RiskResult r)   { result = r; }
 
-    public RiskInput getInput() { return input; }
-    public void setInput(RiskInput input) { this.input = input; }
-
-    public RiskResult getResult() { return result; }
-    public void setResult(RiskResult result) { this.result = result; }
-
-    /** Full copy of the “results” object (five_year_abs, lifetime_abs, …). */
-    public JsonObject getRawResults() { return rawResults; }
-    public void setRawResults(JsonObject rawResults) { this.rawResults = rawResults; }
+    public JsonObject getRawResults()           { return rawResults; }
+    public void       setRawResults(JsonObject j){ rawResults = j; }
 }
 "
 
 "RiskCalculationService.java: "
 "package com.example.breastcancer;
-
 import com.google.gson.JsonObject;
 
-/** Use‑case class that hides the HTTP call from callers. */
-class RiskCalculationService {
-    private ApiClient apiClient;
-    private RiskResponseMapper mapper = new RiskResponseMapper();
+/** Use-case layer – hides HTTP details from Swing controllers. */
+public class RiskCalculationService {
+    private final HttpApiClient          api;
+    private final RiskResponseMapper mapper = new RiskResponseMapper();
 
-    RiskCalculationService(ApiClient apiClient) {
-        this.apiClient = apiClient;
-    }
+    public RiskCalculationService(HttpApiClient api) { this.api = api; }
 
-    RiskAssessment calculate(RiskInput input) throws Exception {
-        JsonObject reqBody = mapper.toRequestJson(input);
-        JsonObject resJson = apiClient.postRisk(reqBody);
-        return mapper.toDomain(input, resJson);
+    public RiskAssessment calculate(RiskInput input) throws Exception {
+        JsonObject req = mapper.toRequestJson(input);
+        JsonObject res = api.postRisk(req);
+        return mapper.toDomain(input, res);
     }
-}"
+}
+"
 
 "RiskFormController.java: "
 "package com.example.breastcancer;
 
-import java.util.Map;
-
 import javax.swing.JOptionPane;
 import javax.swing.SwingWorker;
 
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 /**
- * Orchestrates the form-submit flow:
- *   1. Runs the HTTP call on a background thread.
- *   2. Builds a *flat* JSON object that merges user input + all Gail results –
- *      exactly like the original React and “WORKINGJAVACODEBASE” versions.
- *   3. Shows a friendly dialog if anything goes wrong.
+ * Orchestrates form → API → UI flow.
+ * No interface needed—calls back to MainApp directly.
  */
 public class RiskFormController {
 
     private final RiskCalculationService service;
-    private final GreetingBuilder        greetingBuilder = new GreetingBuilder();
-    private final RiskSubmitListener     listener;
-    private final RiskResponseMapper     mapper          = new RiskResponseMapper();
+    private final RiskResponseMapper     mapper  = new RiskResponseMapper();
+    private final MainApp                mainApp;
+    private Session session;
 
-    public RiskFormController(RiskCalculationService service,
-                              RiskSubmitListener      listener) {
-        this.service  = service;
-        this.listener = listener;
+    public RiskFormController(RiskCalculationService service, Session session, MainApp mainApp) {
+        this.service = service;
+        this.mainApp = mainApp;
+        this.session = session;
     }
 
-    /** Invoked by the Swing panel when the user clicks “Calculate Risk”. */
+    /** Invoked by RiskFormPanel when user clicks “Calculate Risk”. */
     public void onSubmit(final RiskInput input) {
-
         new SwingWorker<Void, Void>() {
-
             private JsonObject merged;
-            private String     greeting;
-            private Exception  error;
+            private String     greet;
+            private Exception  err;
 
             @Override
             protected Void doInBackground() {
                 try {
-                    /* ---- 1. back-end call ---- */
                     RiskAssessment ra = service.calculate(input);
 
-                    /* ---- 2. flatten (React logic) ---- */
-                    merged = mapper.toRequestJson(input);   // start with form fields
+                    // flatten input + results for chat
+                    merged = mapper.toRequestJson(input);
+                    merged.addProperty(
+                        "absolute_risk_5yr",
+                        ra.getResult().getFiveYearRisk()
+                    );
+                    merged.addProperty(
+                        "absolute_risk_lifetime",
+                        ra.getResult().getLifetimeRisk()
+                    );
 
-                    /* Copy *every* Gail field so the back-end receives the same
-                     * rich vital string the React version sends.                */
-                    JsonObject results = ra.getRawResults();
-                    java.util.Iterator<Map.Entry<String, JsonElement>> it =
-                            results.entrySet().iterator();
-                    while (it.hasNext()) {
-                        Map.Entry<String, JsonElement> e = it.next();
-                        merged.add(e.getKey(), e.getValue());
-                    }
-
-                    greeting = greetingBuilder.build(ra);
+                    // one-liner greeting (inlined from GreetingBuilder)
+                    double five = ra.getResult().getFiveYearRisk();
+                    greet = Double.isNaN(five)
+                        ? "Here are your results:"
+                        : String.format(
+                            "Your 5-year absolute risk is %.2f%% – let’s go through what it means.",
+                            five * 100.0
+                          );
 
                 } catch (Exception ex) {
-                    error = ex;
+                    err = ex;
                 }
                 return null;
             }
 
             @Override
             protected void done() {
-                if (error != null) {
+                if (err != null) {
                     JOptionPane.showMessageDialog(
                         null,
-                        "Unable to calculate risk right now.\nDetails: " + error,
+                        "Unable to calculate risk right now.\nDetails: " + err,
                         "Connection problem",
                         JOptionPane.ERROR_MESSAGE
                     );
                     return;
                 }
-                listener.onRiskSuccess(merged, greeting);
+                // Call MainApp directly
+                mainApp.onRiskSuccess(merged, greet);
             }
         }.execute();
     }
@@ -494,7 +672,6 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
-
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -509,48 +686,34 @@ import javax.swing.SwingConstants;
 
 public class RiskFormPanel extends JPanel {
     public static final int[] RACE_VALUES = { 1, 2, 3, 7, 8, 9, 10, 11, 12 };
-
     private final RiskFormController controller;
-
+    private Session session;
     private JSpinner ageSpinner;
-    private JComboBox<String> menarchBox;
-    private JComboBox<String> liveBirthBox;
-    private JComboBox<String> biopsyBox;
-    private JComboBox<String> numBiopsyBox;
-    private JComboBox<String> ihypBox;
-    private JComboBox<String> relativesBox;
-    private JComboBox<String> raceBox;
+    private JComboBox<String> menarchBox, liveBirthBox, biopsyBox, numBiopsyBox, ihypBox, relativesBox, raceBox;
     private JPanel biopsyDetails;
     private JButton submitBtn;
     private JLabel errorLabel;
-
-    public RiskFormPanel(RiskFormController controller) {
+    public RiskFormPanel(RiskFormController controller, Session session) {
+        this.session = session;
         this.controller = controller;
         build();
     }
-
     private void build() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
-
         add(centeredLabel("Breast Cancer Risk Parameters", 18f));
-
         ageSpinner = new JSpinner(new SpinnerNumberModel(48, 35, 85, 1));
         add(labeled("Woman’s current age (35–85):", ageSpinner));
-
         menarchBox = new JComboBox<>(new String[]{
             "≥ 14 yrs / Unknown", "12 – 13 yrs", "7 – 11 yrs"
         });
         add(labeled("Age at first period:", menarchBox));
-
         liveBirthBox = new JComboBox<>(new String[]{
             "Unknown or < 20 yrs", "20 – 24 yrs", "25 – 29 yrs or No births", "≥ 30 yrs"
         });
         add(labeled("Age at first live birth:", liveBirthBox));
-
         biopsyBox = new JComboBox<>(new String[]{"No / Unknown", "Yes"});
         add(labeled("Ever had biopsy?", biopsyBox));
-
         biopsyDetails = new JPanel();
         biopsyDetails.setLayout(new BoxLayout(biopsyDetails, BoxLayout.Y_AXIS));
         numBiopsyBox = new JComboBox<>(new String[]{
@@ -563,30 +726,25 @@ public class RiskFormPanel extends JPanel {
         biopsyDetails.add(labeled("Atypical hyperplasia?", ihypBox));
         add(biopsyDetails);
         biopsyDetails.setVisible(false);
-
         // Anonymous inner class (no lambdas) to toggle biopsy detail panel
         biopsyBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 biopsyDetails.setVisible(biopsyBox.getSelectedIndex() == 1);
             }
         });
-
         relativesBox = new JComboBox<>(new String[]{
             "0 relatives / Unknown", "1", "> 1"
         });
         add(labeled("First-degree relatives with breast cancer:", relativesBox));
-
         raceBox = new JComboBox<>(new String[]{
             "White / Unknown / American-Indian", "African-American", "Hispanic",
             "Chinese", "Japanese", "Filipino", "Hawaiian",
             "Other Pacific Islander", "Other Asian-American"
         });
         add(labeled("Race / Ethnicity:", raceBox));
-
         errorLabel = new JLabel(" ");
         errorLabel.setForeground(Color.RED);
         add(errorLabel);
-
         submitBtn = new JButton("Calculate Risk");
         submitBtn.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -596,7 +754,6 @@ public class RiskFormPanel extends JPanel {
         add(Box.createRigidArea(new Dimension(0, 10)));
         add(submitBtn);
     }
-
     private JLabel centeredLabel(String text, float size) {
         JLabel lbl = new JLabel(text, SwingConstants.CENTER);
         lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -604,7 +761,6 @@ public class RiskFormPanel extends JPanel {
         lbl.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
         return lbl;
     }
-
     private JPanel labeled(String label, JComponent comp) {
         JPanel p = new JPanel(new BorderLayout());
         p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
@@ -614,8 +770,7 @@ public class RiskFormPanel extends JPanel {
         p.add(comp, BorderLayout.CENTER);
         return p;
     }
-
-    /** Collects widget values, validates, then hands the input object to the controller. */
+    // ACTION LISTENER HELPER
     private void submit() {
         int age = ((Integer) ageSpinner.getValue()).intValue();
         if (age < 35 || age > 85) {
@@ -624,12 +779,10 @@ public class RiskFormPanel extends JPanel {
         }
         errorLabel.setText("Calculating…");
         submitBtn.setEnabled(false);
-
         RiskInput input = new RiskInput();
         input.setAge(age);
         input.setMenarchAgeIndex(menarchBox.getSelectedIndex());
         input.setLiveBirthAgeIndex(liveBirthBox.getSelectedIndex());
-
         int biopsyIdx = biopsyBox.getSelectedIndex();
         input.setBiopsyIndex(biopsyIdx);
         if (biopsyIdx == 0) {
@@ -643,15 +796,10 @@ public class RiskFormPanel extends JPanel {
             }
             input.setIhypIndex(ihypVal);
         }
-
         input.setRelativesIndex(relativesBox.getSelectedIndex());
         input.setRaceCode(RACE_VALUES[raceBox.getSelectedIndex()]);
-
-        // Delegate to controller (it re‑enables the button via listener callback)
         controller.onSubmit(input);
     }
-
-    /** Allows controller to re‑enable the Calculate button after completion. */
     public void enableSubmitButton() {
         submitBtn.setEnabled(true);
     }
@@ -716,19 +864,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
 /**
- * Builds the exact request body expected by the Flask back-end and converts the
- * reply to Java domain objects.  This version understands the *current* field
- * names used by the open-source GAIL endpoint:
- *
- *   • five_year_abs   /  five_year_ave
- *   • lifetime_abs    /  lifetime_ave
- *
- * For robustness we still accept the older
- * absolute_risk_5yr / absolute_risk_lifetime names some deployments use.
+ * Same JSON marshalling / un-marshalling logic your React front-end used,
+ * lifted into one class so it can be unit-tested.
  */
 public class RiskResponseMapper {
 
-    /* ───────────────── request side ───────────────── */
+    /* ---------- request side ---------- */
 
     public JsonObject toRequestJson(RiskInput in) {
         JsonObject body = new JsonObject();
@@ -738,75 +879,44 @@ public class RiskResponseMapper {
         body.addProperty("live_birth_age",    in.getLiveBirthAgeIndex());
         body.addProperty("ever_had_biopsy",   in.getBiopsyIndex());
 
-        /* Unknown hyperplasia (combo index 2) must be sent as 99 – just like
-         * the React code. */
         if (in.getBiopsyIndex() == 0) {
             body.addProperty("num_biopsy", 0);
             body.addProperty("ihyp",       99);
         } else {
             body.addProperty("num_biopsy", in.getNumBiopsyIndex());
-            int ihyp = in.getIhypIndex();
-            if (ihyp == 2) ihyp = 99;
+            int ihyp = in.getIhypIndex() == 2 ? 99 : in.getIhypIndex();
             body.addProperty("ihyp", ihyp);
         }
 
         body.addProperty("first_deg_relatives", in.getRelativesIndex());
         body.addProperty("race",                in.getRaceCode());
-
         return body;
     }
 
-    /* ───────────────── response side ───────────────── */
+    /* ---------- response side ---------- */
 
     public RiskAssessment toDomain(RiskInput input, JsonObject raw) {
-        if (raw == null || raw.isJsonNull()) {
-            throw new IllegalStateException("API response is empty.");
-        }
+        JsonObject assessment = raw.getAsJsonObject("assessment");
+        JsonObject results    = assessment.getAsJsonObject("results");
 
-        JsonObject assessmentObj = objOrNull(raw.get("assessment"));
-        if (assessmentObj == null) {
-            throw new IllegalStateException("Response is missing the “assessment” object.");
-        }
-
-        JsonObject resultsObj = objOrNull(assessmentObj.get("results"));
-        if (resultsObj == null) {
-            throw new IllegalStateException("Response is missing the “results” object.");
-        }
-
-        /* Pull the *absolute* 5-year and lifetime risks – fall back to the
-         * older field names if necessary. */
-        double fiveYear = doubleOrNaN(resultsObj.get("five_year_abs"));
-        if (Double.isNaN(fiveYear)) {
-            fiveYear = doubleOrNaN(resultsObj.get("absolute_risk_5yr"));
-        }
-
-        double lifetime = doubleOrNaN(resultsObj.get("lifetime_abs"));
-        if (Double.isNaN(lifetime)) {
-            lifetime = doubleOrNaN(resultsObj.get("absolute_risk_lifetime"));
-        }
+        double five   = get(results, "five_year_abs", "absolute_risk_5yr");
+        double life   = get(results, "lifetime_abs",  "absolute_risk_lifetime");
 
         RiskResult rr = new RiskResult();
-        rr.setFiveYearRisk(fiveYear);
-        rr.setLifetimeRisk(lifetime);
+        rr.setFiveYearRisk(five);
+        rr.setLifetimeRisk(life);
 
         RiskAssessment ra = new RiskAssessment();
         ra.setInput(input);
         ra.setResult(rr);
-        /* Keep an *independent* copy so callers can modify it safely. */
-        ra.setRawResults(resultsObj.deepCopy());
-
+        ra.setRawResults(results.deepCopy());
         return ra;
     }
 
-    /* ───────────────── helpers ───────────────── */
-
-    private JsonObject objOrNull(JsonElement el) {
-        return (el != null && el.isJsonObject()) ? el.getAsJsonObject() : null;
-    }
-
-    private double doubleOrNaN(JsonElement el) {
-        if (el == null || el.isJsonNull()) return Double.NaN;
-        try { return el.getAsDouble(); } catch (Exception ex) { return Double.NaN; }
+    private double get(JsonObject obj, String modern, String legacy) {
+        JsonElement el = obj.get(modern);
+        if (el == null || el.isJsonNull()) el = obj.get(legacy);
+        return (el == null || el.isJsonNull()) ? Double.NaN : el.getAsDouble();
     }
 }
 "
@@ -814,31 +924,187 @@ public class RiskResponseMapper {
 "RiskResult.java: "
 "package com.example.breastcancer;
 
-/** Holds the two risk values returned by the Flask API. */
+/** Holds the two absolute-risk numbers returned by Flask. */
 public class RiskResult {
     private double fiveYearRisk;
     private double lifetimeRisk;
 
-    public double getFiveYearRisk() { return fiveYearRisk; }
-    public void setFiveYearRisk(double fiveYearRisk) { this.fiveYearRisk = fiveYearRisk; }
+    public double getFiveYearRisk()      { return fiveYearRisk; }
+    public void   setFiveYearRisk(double v) { fiveYearRisk = v; }
 
-    public double getLifetimeRisk() { return lifetimeRisk; }
-    public void setLifetimeRisk(double lifetimeRisk) { this.lifetimeRisk = lifetimeRisk; }
+    public double getLifetimeRisk()      { return lifetimeRisk; }
+    public void   setLifetimeRisk(double v) { lifetimeRisk = v; }
 }"
 
-"RiskSubmitListener.java: "
+"Session.java: "
 "package com.example.breastcancer;
 
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
+
+import com.google.auth.oauth2.GoogleCredentials;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.FirebaseOptions;
+import com.google.firebase.auth.FirebaseAuth;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 /**
- * Callback used by RiskFormController → MainApp.
- * Exactly the same signature as in your original working code.
+ * Keeps track of the logged-in user, performs register / sign-in
+ * via Firebase Auth REST API, and stores the user-specific risk data.
  */
-@FunctionalInterface
-public interface RiskSubmitListener {
-    void onRiskSuccess(JsonObject merged, String greeting);
-}"
+public class Session {
+
+    // Resource filenames (must be placed in src/main/resources)
+    private static final String SERVICE_ACCOUNT_FILE = "breast-cancer-react-9d2892f8bb57.json";
+    private static final String WEBAPP_CONFIG_FILE   = "breast-cancer-react-webapp.json";
+
+    private static FirebaseAuth auth;
+    private static boolean firebaseReady = false;
+
+    // Holds the Firebase Web API Key loaded from WEBAPP_CONFIG_FILE
+    private static String webApiKey;
+    private static boolean webAppConfigLoaded = false;
+
+    /* ---------- per-user state ---------- */
+    private Credentials credentials;
+    private boolean     loggedIn = false;
+    private final List<JsonObject> riskCache = new ArrayList<>();
+
+    public Session() {
+        // Initialize the Admin SDK once
+        if (!firebaseReady) {
+            firebaseReady = initFirebase();
+            System.out.println("Firebase Admin SDK initialized? " + firebaseReady);
+        }
+        // Load the Web API Key once
+        if (!webAppConfigLoaded) {
+            webAppConfigLoaded = initWebAppConfig();
+            System.out.println("Web-app config loaded? " + webAppConfigLoaded);
+        }
+    }
+
+    /** Load service account JSON and initialize Admin SDK */
+    private boolean initFirebase() {
+        try (InputStream in = Session.class
+                .getClassLoader()
+                .getResourceAsStream(SERVICE_ACCOUNT_FILE)) {
+            if (in == null) {
+                System.err.println("Cannot find: " + SERVICE_ACCOUNT_FILE);
+                return false;
+            }
+            GoogleCredentials cred = GoogleCredentials.fromStream(in);
+            FirebaseOptions opt = FirebaseOptions.builder()
+                    .setCredentials(cred)
+                    .build();
+            FirebaseApp app = FirebaseApp.initializeApp(opt);
+            auth = FirebaseAuth.getInstance(app);
+            return true;
+        } catch (Exception ex) {
+            System.err.println("Failed to init Firebase Admin SDK: " + ex.getMessage());
+            return false;
+        }
+    }
+
+    /** Load web-app JSON and extract the apiKey */
+    private boolean initWebAppConfig() {
+        try (InputStream in = Session.class
+                .getClassLoader()
+                .getResourceAsStream(WEBAPP_CONFIG_FILE)) {
+            if (in == null) {
+                System.err.println("Cannot find: " + WEBAPP_CONFIG_FILE);
+                return false;
+            }
+            JsonObject cfg = JsonParser
+                .parseReader(new InputStreamReader(in, StandardCharsets.UTF_8))
+                .getAsJsonObject();
+            if (cfg.has("apiKey")) {
+                webApiKey = cfg.get("apiKey").getAsString();
+                return true;
+            } else {
+                System.err.println("No apiKey in " + WEBAPP_CONFIG_FILE);
+                return false;
+            }
+        } catch (Exception ex) {
+            System.err.println("Failed to load web-app config: " + ex.getMessage());
+            return false;
+        }
+    }
+
+    /** Use env-var if set, otherwise the key from your webapp JSON */
+    private String getApiKey() {
+        String env = System.getenv("FIREBASE_API_KEY");
+        if (env != null && !env.isBlank()) return env;
+        return webApiKey;
+    }
+
+    /* ======================================================================
+     *  PUBLIC API
+     * ====================================================================== */
+    public boolean register(Credentials creds) {
+        String key = getApiKey();
+        if (key == null || key.isEmpty()) {
+            System.err.println("No Firebase API key available");
+            return false;
+        }
+        String url = 
+          "https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=" + key;
+        return callAuthEndpoint(url, creds);
+    }
+
+    public boolean login(Credentials creds) {
+        String key = getApiKey();
+        if (key == null || key.isEmpty()) {
+            System.err.println("No Firebase API key available");
+            return false;
+        }
+        String url =
+          "https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=" + key;
+        boolean ok = callAuthEndpoint(url, creds);
+        if (ok) {
+            this.credentials = creds;
+            this.loggedIn = true;
+        }
+        return ok;
+    }
+
+    public boolean isLoggedIn()            { return loggedIn; }
+    public List<JsonObject> getRiskCache() { return riskCache; }
+    public void addRisk(JsonObject j)      { riskCache.add(j); }
+
+    /* ---------- low-level REST call ---------- */
+    private boolean callAuthEndpoint(String url, Credentials creds) {
+        try {
+            JsonObject body = new JsonObject();
+            body.addProperty("email",              creds.getUsername());
+            body.addProperty("password",           creds.getPassword());
+            body.addProperty("returnSecureToken",  true);
+
+            HttpClient client = HttpClient.newHttpClient();
+            HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(url))
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(
+                    body.toString(), StandardCharsets.UTF_8))
+                .build();
+
+            HttpResponse<String> res = 
+                client.send(req, HttpResponse.BodyHandlers.ofString());
+            return res.statusCode() == 200;
+        } catch (Exception ex) {
+            System.err.println("Auth endpoint error: " + ex.getMessage());
+            return false;
+        }
+    }
+}
+"
 
 "combine.py: "
 "import os
@@ -850,7 +1116,7 @@ def print_folder(path, out_file, skip_name):
     # First, write all files at this level
     for name in entries:
         # Skip the output file itself
-        if name == skip_name or name == 'WORKINGJAVACODEBASE.txt':
+        if name == skip_name or name == 'WORKINGJAVACODEBASE.txt' or name.startswith('src/test') or name.endswith('.class') or name.startswith('.'):
             continue
 
         full_path = os.path.join(path, name)
@@ -877,162 +1143,11 @@ def print_folder(path, out_file, skip_name):
             print(f'"{name} - End"\n', file=out_file)
 
 if __name__ == '__main__':
-    start_dir = os.getcwd()
+    start_dir = '/Users/saisurisetti/Desktop/breast-cancer-chatbot/src/main/java/com/example/breastcancer'
+    out_dir = os.getcwd()
     output_filename = 'COMBINEDOUTPUTJAVA.txt'
-    output_path = os.path.join(start_dir, output_filename)
+    output_path = os.path.join(out_dir, output_filename)
     with open(output_path, 'w', encoding='utf-8') as out:
         print_folder(start_dir, out, output_filename)
     print(f"Directory listing written to {output_path}")"
-
-"breastcancer - End"
-
-"example - End"
-
-"com - End"
-
-"java - End"
-
-"resources - Start :"
-"logo.png: "
-"<Could not read file: 'utf-8' codec can't decode byte 0x89 in position 0: invalid start byte>"
-
-"resources - End"
-
-"main - End"
-
-"test - Start :"
-"java - Start :"
-"java - End"
-
-"test - End"
-
-"src - End"
-
-"target - Start :"
-"classes - Start :"
-"logo.png: "
-"<Could not read file: 'utf-8' codec can't decode byte 0x89 in position 0: invalid start byte>"
-
-"com - Start :"
-"example - Start :"
-"breastcancer - Start :"
-"ApiClient.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"ChatMessage.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"ChatPanel$1.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"ChatPanel$2.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"ChatPanel$3.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"ChatPanel.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"GreetingBuilder.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"HttpApiClient.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"MainApp$1.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"MainApp.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskAssessment.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskCalculationService.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskFormController$1.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskFormController.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskFormPanel$1.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskFormPanel$2.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskFormPanel.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskInput.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskResponseMapper.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskResult.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"RiskSubmitListener.class: "
-"<Could not read file: 'utf-8' codec can't decode byte 0xca in position 0: invalid continuation byte>"
-
-"combine.py: "
-"import os
-
-def print_folder(path, out_file, skip_name):
-    # List entries sorted so output is deterministic
-    entries = sorted(os.listdir(path))
-    
-    # First, write all files at this level
-    for name in entries:
-        # Skip the output file itself
-        if name == skip_name or name == 'WORKINGJAVACODEBASE.txt':
-            continue
-
-        full_path = os.path.join(path, name)
-        if os.path.isfile(full_path):
-            filename, ext = os.path.splitext(name)
-            ext = ext.lstrip('.')  # remove the leading dot
-            try:
-                with open(full_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-            except Exception as e:
-                content = f"<Could not read file: {e}>"
-            print(f'"{filename}.{ext}: "', file=out_file)
-            print(f'"{content}"\n', file=out_file)
-    
-    # Then, recurse into each subdirectory
-    for name in entries:
-        if name == skip_name:
-            continue
-
-        full_path = os.path.join(path, name)
-        if os.path.isdir(full_path):
-            print(f'"{name} - Start :"', file=out_file)
-            print_folder(full_path, out_file, skip_name)
-            print(f'"{name} - End"\n', file=out_file)
-
-if __name__ == '__main__':
-    start_dir = os.getcwd()
-    output_filename = 'COMBINEDOUTPUTJAVA.txt'
-    output_path = os.path.join(start_dir, output_filename)
-    with open(output_path, 'w', encoding='utf-8') as out:
-        print_folder(start_dir, out, output_filename)
-    print(f"Directory listing written to {output_path}")"
-
-"breastcancer - End"
-
-"example - End"
-
-"com - End"
-
-"classes - End"
-
-"test-classes - Start :"
-"test-classes - End"
-
-"target - End"
 

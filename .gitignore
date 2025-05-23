@@ -4,3 +4,4 @@ resources/
 
 # ignore your combine.py script
 src/main/java/com/example/breastcancer/combine.py
+GUIBuilder/

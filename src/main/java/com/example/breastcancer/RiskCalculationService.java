@@ -1,19 +1,16 @@
 package com.example.breastcancer;
-
 import com.google.gson.JsonObject;
 
-/** Use‑case class that hides the HTTP call from callers. */
-class RiskCalculationService {
-    private ApiClient apiClient;
-    private RiskResponseMapper mapper = new RiskResponseMapper();
+/** Use-case layer – hides HTTP details from Swing controllers. */
+public class RiskCalculationService {
+    private final HttpApiClient          api;
+    private final RiskResponseMapper mapper = new RiskResponseMapper();
 
-    RiskCalculationService(ApiClient apiClient) {
-        this.apiClient = apiClient;
-    }
+    public RiskCalculationService(HttpApiClient api) { this.api = api; }
 
-    RiskAssessment calculate(RiskInput input) throws Exception {
-        JsonObject reqBody = mapper.toRequestJson(input);
-        JsonObject resJson = apiClient.postRisk(reqBody);
-        return mapper.toDomain(input, resJson);
+    public RiskAssessment calculate(RiskInput input) throws Exception {
+        JsonObject req = mapper.toRequestJson(input);
+        JsonObject res = api.postRisk(req);
+        return mapper.toDomain(input, res);
     }
 }

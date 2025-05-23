@@ -5,7 +5,6 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
-
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -20,48 +19,34 @@ import javax.swing.SwingConstants;
 
 public class RiskFormPanel extends JPanel {
     public static final int[] RACE_VALUES = { 1, 2, 3, 7, 8, 9, 10, 11, 12 };
-
     private final RiskFormController controller;
-
+    private Session session;
     private JSpinner ageSpinner;
-    private JComboBox<String> menarchBox;
-    private JComboBox<String> liveBirthBox;
-    private JComboBox<String> biopsyBox;
-    private JComboBox<String> numBiopsyBox;
-    private JComboBox<String> ihypBox;
-    private JComboBox<String> relativesBox;
-    private JComboBox<String> raceBox;
+    private JComboBox<String> menarchBox, liveBirthBox, biopsyBox, numBiopsyBox, ihypBox, relativesBox, raceBox;
     private JPanel biopsyDetails;
     private JButton submitBtn;
     private JLabel errorLabel;
-
-    public RiskFormPanel(RiskFormController controller) {
+    public RiskFormPanel(RiskFormController controller, Session session) {
+        this.session = session;
         this.controller = controller;
         build();
     }
-
     private void build() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
-
         add(centeredLabel("Breast Cancer Risk Parameters", 18f));
-
         ageSpinner = new JSpinner(new SpinnerNumberModel(48, 35, 85, 1));
         add(labeled("Woman’s current age (35–85):", ageSpinner));
-
         menarchBox = new JComboBox<>(new String[]{
             "≥ 14 yrs / Unknown", "12 – 13 yrs", "7 – 11 yrs"
         });
         add(labeled("Age at first period:", menarchBox));
-
         liveBirthBox = new JComboBox<>(new String[]{
             "Unknown or < 20 yrs", "20 – 24 yrs", "25 – 29 yrs or No births", "≥ 30 yrs"
         });
         add(labeled("Age at first live birth:", liveBirthBox));
-
         biopsyBox = new JComboBox<>(new String[]{"No / Unknown", "Yes"});
         add(labeled("Ever had biopsy?", biopsyBox));
-
         biopsyDetails = new JPanel();
         biopsyDetails.setLayout(new BoxLayout(biopsyDetails, BoxLayout.Y_AXIS));
         numBiopsyBox = new JComboBox<>(new String[]{
@@ -74,30 +59,25 @@ public class RiskFormPanel extends JPanel {
         biopsyDetails.add(labeled("Atypical hyperplasia?", ihypBox));
         add(biopsyDetails);
         biopsyDetails.setVisible(false);
-
         // Anonymous inner class (no lambdas) to toggle biopsy detail panel
         biopsyBox.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 biopsyDetails.setVisible(biopsyBox.getSelectedIndex() == 1);
             }
         });
-
         relativesBox = new JComboBox<>(new String[]{
             "0 relatives / Unknown", "1", "> 1"
         });
         add(labeled("First-degree relatives with breast cancer:", relativesBox));
-
         raceBox = new JComboBox<>(new String[]{
             "White / Unknown / American-Indian", "African-American", "Hispanic",
             "Chinese", "Japanese", "Filipino", "Hawaiian",
             "Other Pacific Islander", "Other Asian-American"
         });
         add(labeled("Race / Ethnicity:", raceBox));
-
         errorLabel = new JLabel(" ");
         errorLabel.setForeground(Color.RED);
         add(errorLabel);
-
         submitBtn = new JButton("Calculate Risk");
         submitBtn.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -107,7 +87,6 @@ public class RiskFormPanel extends JPanel {
         add(Box.createRigidArea(new Dimension(0, 10)));
         add(submitBtn);
     }
-
     private JLabel centeredLabel(String text, float size) {
         JLabel lbl = new JLabel(text, SwingConstants.CENTER);
         lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -115,7 +94,6 @@ public class RiskFormPanel extends JPanel {
         lbl.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
         return lbl;
     }
-
     private JPanel labeled(String label, JComponent comp) {
         JPanel p = new JPanel(new BorderLayout());
         p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
@@ -125,8 +103,7 @@ public class RiskFormPanel extends JPanel {
         p.add(comp, BorderLayout.CENTER);
         return p;
     }
-
-    /** Collects widget values, validates, then hands the input object to the controller. */
+    // ACTION LISTENER HELPER
     private void submit() {
         int age = ((Integer) ageSpinner.getValue()).intValue();
         if (age < 35 || age > 85) {
@@ -135,12 +112,10 @@ public class RiskFormPanel extends JPanel {
         }
         errorLabel.setText("Calculating…");
         submitBtn.setEnabled(false);
-
         RiskInput input = new RiskInput();
         input.setAge(age);
         input.setMenarchAgeIndex(menarchBox.getSelectedIndex());
         input.setLiveBirthAgeIndex(liveBirthBox.getSelectedIndex());
-
         int biopsyIdx = biopsyBox.getSelectedIndex();
         input.setBiopsyIndex(biopsyIdx);
         if (biopsyIdx == 0) {
@@ -154,15 +129,10 @@ public class RiskFormPanel extends JPanel {
             }
             input.setIhypIndex(ihypVal);
         }
-
         input.setRelativesIndex(relativesBox.getSelectedIndex());
         input.setRaceCode(RACE_VALUES[raceBox.getSelectedIndex()]);
-
-        // Delegate to controller (it re‑enables the button via listener callback)
         controller.onSubmit(input);
     }
-
-    /** Allows controller to re‑enable the Calculate button after completion. */
     public void enableSubmitButton() {
         submitBtn.setEnabled(true);
     }

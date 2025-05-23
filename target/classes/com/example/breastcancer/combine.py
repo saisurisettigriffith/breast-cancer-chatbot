@@ -7,7 +7,7 @@ def print_folder(path, out_file, skip_name):
     # First, write all files at this level
     for name in entries:
         # Skip the output file itself
-        if name == skip_name or name == 'WORKINGJAVACODEBASE.txt':
+        if name == skip_name or name == 'WORKINGJAVACODEBASE.txt' or name.startswith('src/test') or name.endswith('.class') or name.startswith('.'):
             continue
 
         full_path = os.path.join(path, name)
@@ -34,9 +34,10 @@ def print_folder(path, out_file, skip_name):
             print(f'"{name} - End"\n', file=out_file)
 
 if __name__ == '__main__':
-    start_dir = os.getcwd()
+    start_dir = '/Users/saisurisetti/Desktop/breast-cancer-chatbot/src/main/java/com/example/breastcancer'
+    out_dir = os.getcwd()
     output_filename = 'COMBINEDOUTPUTJAVA.txt'
-    output_path = os.path.join(start_dir, output_filename)
+    output_path = os.path.join(out_dir, output_filename)
     with open(output_path, 'w', encoding='utf-8') as out:
         print_folder(start_dir, out, output_filename)
     print(f"Directory listing written to {output_path}")

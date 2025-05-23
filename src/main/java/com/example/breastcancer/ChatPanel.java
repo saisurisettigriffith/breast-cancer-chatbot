@@ -10,7 +10,6 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
-
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
@@ -19,17 +18,18 @@ import com.google.gson.JsonObject;
  */
 public class ChatPanel extends JPanel {
 
-    private final ApiClient api;
+    private final HttpApiClient api;
     private final String    sessionId;
     private final List<JsonObject> riskCache;
 
     private final JTextArea  chatArea  = new JTextArea();
     private final JTextField inputFld  = new JTextField();
     private final JButton    sendBtn   = new JButton("Send");
+    private final JButton    gailBtn = new JButton("Refill Form");
 
     private final Gson gson = new Gson();
 
-    public ChatPanel(ApiClient api, String sessionId, List<JsonObject> riskCache, String greeting) {
+    public ChatPanel(HttpApiClient api, String sessionId, List<JsonObject> riskCache, String greeting) {
         this.api       = api;
         this.sessionId = sessionId;
         this.riskCache = riskCache;
@@ -59,6 +59,11 @@ public class ChatPanel extends JPanel {
         });
         inputFld.addActionListener(new java.awt.event.ActionListener() {
             @Override public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+        });
+        gailBtn.addActionListener(new java.awt.event.ActionListener() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                
+            }
         });
     }
 

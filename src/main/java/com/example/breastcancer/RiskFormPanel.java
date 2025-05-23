@@ -21,6 +21,10 @@ import javax.swing.SwingConstants;
 
 /**
  * Swing form for collecting breast-cancer risk parameters.
+ *
+ * Added (23 May 2025):
+ *  • Consistent #eeeeee background.
+ *  • Top-right “Logout” button that returns to Login.
  */
 public class RiskFormPanel extends JPanel {
     public static final int[] RACE_VALUES = {
@@ -29,17 +33,18 @@ public class RiskFormPanel extends JPanel {
 
     private final RiskFormController controller;
     private final Session            session;
-    private JSpinner                  ageSpinner;
+    private JSpinner                 ageSpinner;
     private JComboBox<String>        menarchBox,
-                                    liveBirthBox,
-                                    biopsyBox,
-                                    numBiopsyBox,
-                                    ihypBox,
-                                    relativesBox,
-                                    raceBox;
-    private JPanel                    biopsyDetails;
-    private JButton                   submitBtn;
-    private JLabel                    errorLabel;
+                                     liveBirthBox,
+                                     biopsyBox,
+                                     numBiopsyBox,
+                                     ihypBox,
+                                     relativesBox,
+                                     raceBox;
+    private JPanel                   biopsyDetails;
+    private JButton                  submitBtn;
+    private JButton                  logoutBtn;     // ← NEW
+    private JLabel                   errorLabel;
 
     public RiskFormPanel(RiskFormController controller, Session session) {
         this.controller = controller;
@@ -50,6 +55,20 @@ public class RiskFormPanel extends JPanel {
     private void build() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
+        setBackground(new Color(0xeeeeee));               // ← uniform style
+
+        /* ---- navigation bar ---- */
+        JPanel nav = new JPanel(new BorderLayout());
+        nav.setOpaque(false);
+        logoutBtn = new JButton("Logout");
+        logoutBtn.addActionListener(new java.awt.event.ActionListener() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent evt) {
+                controller.onLogout();
+            }
+        });
+        nav.add(logoutBtn, BorderLayout.EAST);
+        nav.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
+        add(nav);
 
         add(centeredLabel("Breast Cancer Risk Parameters", 18f));
 
@@ -79,6 +98,7 @@ public class RiskFormPanel extends JPanel {
 
         biopsyDetails = new JPanel();
         biopsyDetails.setLayout(new BoxLayout(biopsyDetails, BoxLayout.Y_AXIS));
+        biopsyDetails.setOpaque(false);
         numBiopsyBox = new JComboBox<>(new String[]{
             "0 biopsies",
             "1 biopsy or unknown count",
@@ -145,6 +165,7 @@ public class RiskFormPanel extends JPanel {
     private JPanel labeled(String label, JComponent comp) {
         JPanel p = new JPanel(new BorderLayout());
         p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        p.setOpaque(false);
         JLabel l = new JLabel(label);
         l.setPreferredSize(new Dimension(280, 28));
         p.add(l, BorderLayout.WEST);

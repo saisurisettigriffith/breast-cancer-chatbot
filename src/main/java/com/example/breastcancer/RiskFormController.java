@@ -8,6 +8,9 @@ import com.google.gson.JsonObject;
 /**
  * Orchestrates form → API → UI flow.
  * No interface needed—calls back to MainApp directly.
+ *
+ * Added (23 May 2025):
+ *  • {@link #onLogout()} helper invoked by RiskFormPanel.
  */
 public class RiskFormController {
 
@@ -75,5 +78,10 @@ public class RiskFormController {
                 mainApp.onRiskSuccess(merged, greet);
             }
         }.execute();
+    }
+
+    /* Invoked by RiskFormPanel when the user clicks “Logout”. */
+    public void onLogout() {
+        mainApp.logout();
     }
 }

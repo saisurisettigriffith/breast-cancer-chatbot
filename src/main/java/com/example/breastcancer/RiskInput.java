@@ -40,6 +40,27 @@ public class RiskInput {
     public int getRaceCode() { return raceCode; }
     public void setRaceCode(int raceCode) { this.raceCode = raceCode; }
 
+    /**
+     * 
+     * Traditional ML <---
+     * ***
+     * 
+     * Race or Age <--- Smoking ..... higher weightage
+     * 
+     * 1. Explain the work
+     * any question, know everything
+     * entire code
+     * gail inner workings
+     * live code discussion (line of code - reference to explaination)
+     * explain clearly, audience!!!
+     * 1 week
+     * you have to own it
+     * 
+     * Next session: 
+     * 
+     * @return
+     */
+
     /* ───── derived helpers required by RiskAssessmentService ───── */
     public int  getMenarchAgeCode()          { return menarchAgeIndex;            }
     public int  getFirstLiveBirthCode()      { return liveBirthAgeIndex;          }

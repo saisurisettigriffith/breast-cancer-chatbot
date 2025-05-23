@@ -1,8 +1,9 @@
+// File: src/main/java/com/example/breastcancer/MainApp.java
 package com.example.breastcancer;
 
 import java.awt.CardLayout;
-import java.util.List;
 import java.util.UUID;
+
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -10,14 +11,17 @@ import javax.swing.UIManager;
 
 import com.google.gson.JsonObject;
 
+import javafx.embed.swing.JFXPanel;
+import javafx.application.Platform;
+import javafx.scene.Scene;
+
 /**
- * Application entry-point and simple screen-flow manager.
- * All screens live inside one CardLayout so we can jump
- * between them with cards.show(root, "name").
+ * Application entry-point and screen‐flow manager.
+ * Embeds the JavaFX Register/Login forms via JFXPanel,
+ * then swaps to Swing RiskFormPanel and ChatPanel.
  */
 public class MainApp extends JFrame {
 
-    /* ---------- navigation ---------- */
     private final CardLayout cards = new CardLayout();
     private final JPanel     root  = new JPanel(cards);
 
@@ -25,22 +29,11 @@ public class MainApp extends JFrame {
     private final Session                 session   = new Session();
     private final HttpApiClient           api       = new HttpApiClient();
     private final RiskCalculationService  service   = new RiskCalculationService(api);
+    private final String                  sessionId = UUID.randomUUID().toString().substring(0,8);
 
-    /* ---------- UI screens ---------- */
-    private RegisterPanel registerPanel;
-    private LoginPanel    loginPanel;
-    private RiskFormPanel riskFormPanel;
-    private ChatPanel     chatPanel;
-
-    /* ---------- controllers ---------- */
-    private RegisterController registerController;
-    private LoginController    loginController;
-    private RiskFormController riskFormController;
-    private ChatController     chatController;
-
-    /* ---------- misc ---------- */
-    private final String sessionId =
-        UUID.randomUUID().toString().substring(0, 8);
+    /* ---------- JavaFX wrappers ---------- */
+    private final JFXPanel registerFx = new JFXPanel();
+    private final JFXPanel loginFx    = new JFXPanel();
 
     public MainApp() {
         super("Breast-Cancer ChatBot");
@@ -48,66 +41,68 @@ public class MainApp extends JFrame {
         setSize(820, 640);
         setLocationRelativeTo(null);
 
+        // Kick-off JavaFX runtime
+        new JFXPanel();
+
         buildScreens();
         add(root);
-        cards.show(root, "register");          // first screen
+        cards.show(root, "register");
     }
 
-    /* ======================================================================
-     *  Build screens + wire controllers
-     * ====================================================================== */
     private void buildScreens() {
-        /* ---- register / login ---- */
-        registerController = new RegisterController(session, this);
-        registerPanel      = new RegisterPanel(registerController);
-        root.add(registerPanel, "register");
+        // --- REGISTER (JavaFX) ---
+        root.add(registerFx, "register");
+        Platform.runLater(new Runnable() {
+            @Override public void run() {
+                RegisterController rc = new RegisterController(session, MainApp.this);
+                RegisterPanel      p  = new RegisterPanel(rc);
+                registerFx.setScene(new Scene(p.getPane()));
+            }
+        });
 
-        loginController    = new LoginController(session, this);
-        loginPanel         = new LoginPanel(loginController);
-        root.add(loginPanel, "login");
+        // --- LOGIN (JavaFX) ---
+        root.add(loginFx, "login");
+        Platform.runLater(new Runnable() {
+            @Override public void run() {
+                LoginController lc = new LoginController(session, MainApp.this);
+                LoginPanel      p  = new LoginPanel(lc);
+                loginFx.setScene(new Scene(p.getPane()));
+            }
+        });
 
-        /* ---- risk form ---- */
-        riskFormController = new RiskFormController(service, session, this);
-        riskFormPanel      = new RiskFormPanel(riskFormController, session);
-        root.add(riskFormPanel, "form");
+        // --- RISK FORM (Swing) ---
+        RiskFormController rfc = new RiskFormController(service, session, this);
+        RiskFormPanel      rfp = new RiskFormPanel(rfc, session);
+        root.add(rfp, "risk");
+
+        // CHAT panel is created dynamically in onRiskSuccess()
     }
 
-    /* ======================================================================
-     *  Navigation helpers – invoked by controllers
-     * ====================================================================== */
-    public void showLoginPanel()     { cards.show(root, "login");     }
-    public void showRegisterPanel()  { cards.show(root, "register");  }
-
-    /** After successful sign-in. */
+    // Called by LoginController on successful login
     public void onLoginSuccess(String greeting) {
-        if (!session.getRiskCache().isEmpty()) {
-            showChat(session.getRiskCache(), greeting);   // user already has predictions
-        } else {
-            cards.show(root, "form");                     // need parameters first
-        }
+        cards.show(root, "risk");
     }
 
-    /** After /api/risk completes. */
+    // Called by RiskFormController after GAIL returns
     public void onRiskSuccess(JsonObject merged, String greeting) {
         session.addRisk(merged);
-        showChat(session.getRiskCache(), greeting);
-    }
-
-    /* ------------------------------------------------------------------ */
-    private void showChat(List<JsonObject> riskCache, String greeting) {
-        chatController = new ChatController(session, this);
-        chatPanel      = new ChatPanel(api, sessionId, riskCache, greeting);
-        root.add(chatPanel, "chat");
+        ChatPanel chatP = new ChatPanel(api, sessionId, session.getRiskCache(), greeting);
+        root.add(chatP, "chat");
         cards.show(root, "chat");
     }
 
-    /* ====================================================================== */
+    // Navigation helpers
+    public void showLoginPanel()    { cards.show(root, "login");    }
+    public void showRegisterPanel() { cards.show(root, "register"); }
+
     public static void main(String[] args) throws Exception {
         UIManager.setLookAndFeel(
             UIManager.getSystemLookAndFeelClassName()
         );
         SwingUtilities.invokeLater(new Runnable() {
-            public void run() { new MainApp().setVisible(true); }
+            @Override public void run() {
+                new MainApp().setVisible(true);
+            }
         });
     }
 }

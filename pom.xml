@@ -13,6 +13,8 @@
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <maven.compiler.source>11</maven.compiler.source>
     <maven.compiler.target>11</maven.compiler.target>
+    <!-- JavaFX version -->
+    <javafx.version>20</javafx.version>
   </properties>
 
   <dependencies>
@@ -32,14 +34,49 @@
       <artifactId>guava</artifactId>
       <version>31.1-jre</version>
     </dependency>
+
+    <!-- JavaFX modules -->
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-controls</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-fxml</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.openjfx</groupId>
+      <artifactId>javafx-swing</artifactId>
+      <version>${javafx.version}</version>
+    </dependency>
   </dependencies>
 
   <build>
     <plugins>
+      <!-- Compiler plugin remains unchanged -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-compiler-plugin</artifactId>
       </plugin>
+
+      <!-- JavaFX Maven plugin for run and module-path setup -->
+      <plugin>
+        <groupId>org.openjfx</groupId>
+        <artifactId>javafx-maven-plugin</artifactId>
+        <version>0.0.8</version>
+        <configuration>
+          <mainClass>com.example.breastcancer.MainApp</mainClass>
+          <modulePathDependencies>
+            <module>javafx.controls</module>
+            <module>javafx.fxml</module>
+            <module>javafx.swing</module>
+          </modulePathDependencies>
+        </configuration>
+      </plugin>
+
+      <!-- Assembly plugin for fat JAR -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-assembly-plugin</artifactId>

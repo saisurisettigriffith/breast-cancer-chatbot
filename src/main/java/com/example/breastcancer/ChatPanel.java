@@ -1,3 +1,4 @@
+// File: src/main/java/com/example/breastcancer/ChatPanel.java
 package com.example.breastcancer;
 
 import java.awt.BorderLayout;
@@ -10,72 +11,78 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 /**
- * Restores the simple Chat UI from the original code so MainApp compiles.
+ * Simple Swing chat UI that posts to your /api/chat endpoint.
  */
 public class ChatPanel extends JPanel {
 
-    private final HttpApiClient api;
-    private final String    sessionId;
-    private final List<JsonObject> riskCache;
+    private final HttpApiClient        api;
+    private final String               sessionId;
+    private final List<JsonObject>     riskCache;
 
-    private final JTextArea  chatArea  = new JTextArea();
-    private final JTextField inputFld  = new JTextField();
-    private final JButton    sendBtn   = new JButton("Send");
-    private final JButton    gailBtn = new JButton("Refill Form");
+    private final JTextArea  chatArea = new JTextArea();
+    private final JTextField inputFld = new JTextField();
+    private final JButton    sendBtn  = new JButton("Send");
+    private final JButton    gailBtn  = new JButton("Refill Form");
 
     private final Gson gson = new Gson();
 
-    public ChatPanel(HttpApiClient api, String sessionId, List<JsonObject> riskCache, String greeting) {
+    public ChatPanel(HttpApiClient api,
+                     String sessionId,
+                     List<JsonObject> riskCache,
+                     String greeting) {
         this.api       = api;
         this.sessionId = sessionId;
         this.riskCache = riskCache;
         build(greeting);
     }
 
-    /* ---------------- build UI ---------------- */
     private void build(String greeting) {
-        setLayout(new BorderLayout(10, 10));
-        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        setLayout(new BorderLayout(10,10));
+        setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
 
         chatArea.setEditable(false);
         chatArea.setLineWrap(true);
         chatArea.setWrapStyleWord(true);
         add(new JScrollPane(chatArea), BorderLayout.CENTER);
 
-        JPanel bottom = new JPanel(new BorderLayout(5, 5));
+        JPanel bottom = new JPanel(new BorderLayout(5,5));
         bottom.add(inputFld, BorderLayout.CENTER);
         bottom.add(sendBtn,  BorderLayout.EAST);
         add(bottom, BorderLayout.SOUTH);
 
         appendAssistant(greeting);
 
-        /* ---- listeners (anonymous inner classes, no lambdas) ---- */
         sendBtn.addActionListener(new java.awt.event.ActionListener() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                submit();
+            }
         });
         inputFld.addActionListener(new java.awt.event.ActionListener() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                submit();
+            }
         });
         gailBtn.addActionListener(new java.awt.event.ActionListener() {
             @Override public void actionPerformed(java.awt.event.ActionEvent e) {
-                
+                // you could jump back to the form here if you like
             }
         });
     }
 
-    /* ---------------- behaviour ---------------- */
     private void submit() {
-        String msg = inputFld.getText().trim();
+        final String msg = inputFld.getText().trim();
         if (msg.isEmpty()) return;
+
         appendUser(msg);
         inputFld.setText("");
         sendBtn.setEnabled(false);
 
-        new SwingWorker<Void, Void>() {
+        new SwingWorker<Void,Void>() {
             private String answer;
             @Override protected Void doInBackground() throws Exception {
                 JsonObject body = new JsonObject();
@@ -93,7 +100,6 @@ public class ChatPanel extends JPanel {
         }.execute();
     }
 
-    /* ---------------- helpers ---------------- */
     private void appendUser(String txt)      { chatArea.append("You: " + txt + "\n\n"); }
     private void appendAssistant(String txt) { chatArea.append("Bot: " + txt + "\n\n"); }
 }

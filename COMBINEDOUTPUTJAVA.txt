@@ -11,7 +11,8 @@ public class ChatController {
 }"
 
 "ChatPanel.java: "
-"package com.example.breastcancer;
+"// File: src/main/java/com/example/breastcancer/ChatPanel.java
+package com.example.breastcancer;
 
 import java.awt.BorderLayout;
 import java.util.List;
@@ -23,72 +24,78 @@ import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingWorker;
+
 import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 
 /**
- * Restores the simple Chat UI from the original code so MainApp compiles.
+ * Simple Swing chat UI that posts to your /api/chat endpoint.
  */
 public class ChatPanel extends JPanel {
 
-    private final HttpApiClient api;
-    private final String    sessionId;
-    private final List<JsonObject> riskCache;
+    private final HttpApiClient        api;
+    private final String               sessionId;
+    private final List<JsonObject>     riskCache;
 
-    private final JTextArea  chatArea  = new JTextArea();
-    private final JTextField inputFld  = new JTextField();
-    private final JButton    sendBtn   = new JButton("Send");
-    private final JButton    gailBtn = new JButton("Refill Form");
+    private final JTextArea  chatArea = new JTextArea();
+    private final JTextField inputFld = new JTextField();
+    private final JButton    sendBtn  = new JButton("Send");
+    private final JButton    gailBtn  = new JButton("Refill Form");
 
     private final Gson gson = new Gson();
 
-    public ChatPanel(HttpApiClient api, String sessionId, List<JsonObject> riskCache, String greeting) {
+    public ChatPanel(HttpApiClient api,
+                     String sessionId,
+                     List<JsonObject> riskCache,
+                     String greeting) {
         this.api       = api;
         this.sessionId = sessionId;
         this.riskCache = riskCache;
         build(greeting);
     }
 
-    /* ---------------- build UI ---------------- */
     private void build(String greeting) {
-        setLayout(new BorderLayout(10, 10));
-        setBorder(BorderFactory.createEmptyBorder(10, 10, 10, 10));
+        setLayout(new BorderLayout(10,10));
+        setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
 
         chatArea.setEditable(false);
         chatArea.setLineWrap(true);
         chatArea.setWrapStyleWord(true);
         add(new JScrollPane(chatArea), BorderLayout.CENTER);
 
-        JPanel bottom = new JPanel(new BorderLayout(5, 5));
+        JPanel bottom = new JPanel(new BorderLayout(5,5));
         bottom.add(inputFld, BorderLayout.CENTER);
         bottom.add(sendBtn,  BorderLayout.EAST);
         add(bottom, BorderLayout.SOUTH);
 
         appendAssistant(greeting);
 
-        /* ---- listeners (anonymous inner classes, no lambdas) ---- */
         sendBtn.addActionListener(new java.awt.event.ActionListener() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                submit();
+            }
         });
         inputFld.addActionListener(new java.awt.event.ActionListener() {
-            @Override public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                submit();
+            }
         });
         gailBtn.addActionListener(new java.awt.event.ActionListener() {
             @Override public void actionPerformed(java.awt.event.ActionEvent e) {
-                
+                // you could jump back to the form here if you like
             }
         });
     }
 
-    /* ---------------- behaviour ---------------- */
     private void submit() {
-        String msg = inputFld.getText().trim();
+        final String msg = inputFld.getText().trim();
         if (msg.isEmpty()) return;
+
         appendUser(msg);
         inputFld.setText("");
         sendBtn.setEnabled(false);
 
-        new SwingWorker<Void, Void>() {
+        new SwingWorker<Void,Void>() {
             private String answer;
             @Override protected Void doInBackground() throws Exception {
                 JsonObject body = new JsonObject();
@@ -106,10 +113,10 @@ public class ChatPanel extends JPanel {
         }.execute();
     }
 
-    /* ---------------- helpers ---------------- */
     private void appendUser(String txt)      { chatArea.append("You: " + txt + "\n\n"); }
     private void appendAssistant(String txt) { chatArea.append("Bot: " + txt + "\n\n"); }
-}"
+}
+"
 
 "Credentials.java: "
 "package com.example.breastcancer;
@@ -242,85 +249,196 @@ public class LoginController {
 "LoginPanel.java: "
 "package com.example.breastcancer;
 
-import java.awt.Component;
-import java.awt.Dimension;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
-import javax.swing.JPanel;
-import javax.swing.JPasswordField;
-import javax.swing.JTextField;
+import javafx.scene.layout.Pane;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.Button;
+import javafx.scene.text.Font;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
+import javafx.scene.layout.CornerRadii;
+import javafx.geometry.Insets;
+import javafx.scene.paint.Color;
+import javafx.stage.Stage;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.application.Platform;
 
 /**
- * Sign-in form mirroring RegisterPanel.
+ * JavaFX version of your LoginPanel.
+ * Mirrors styling/layout from RegisterPanel and WindowBuilder.
  */
-public class LoginPanel extends JPanel {
+public class LoginPanel {
 
     private final LoginController controller;
+    private final Pane pane;
+    private final TextField emailFld;
+    private final PasswordField passFld;
+    private final Button loginBtn;
+    private final Button registerBtn;
+    private final Label msgLabel;
 
-    private final JTextField     emailFld  = new JTextField();
-    private final JPasswordField passFld   = new JPasswordField();
-    private final JButton        loginBtn  = new JButton("Login");
-    private final JButton        registerBtn = new JButton("Need an account? Register");
-    private final JLabel         msgLabel  = new JLabel(" ");
+    public LoginPanel(LoginController controller) {
+        this.controller = controller;
 
-    public LoginPanel(LoginController c) {
-        controller = c;
-        build();
+        pane = new Pane();
+        pane.setPrefSize(1177, 600);
+        pane.setStyle("-fx-background-color: #eeeeee;");
+
+        // E-mail field
+        emailFld = new TextField();
+        emailFld.setLayoutX(553.0);
+        emailFld.setLayoutY(162.0);
+        emailFld.setPrefWidth(200.0);
+        emailFld.setPromptText("E-mail");
+        emailFld.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        emailFld.setStyle(
+            "-fx-background-color: #ffffff; " +
+            "-fx-text-fill: #1b1b1b; " +
+            "-fx-border-color: #626262; " +
+            "-fx-border-width: 1px; " +
+            "-fx-border-radius: 2px; " +
+            "-fx-prompt-text-fill: #737674;"
+        );
+
+        // Password field
+        passFld = new PasswordField();
+        passFld.setLayoutX(553.0);
+        passFld.setLayoutY(195.0);
+        passFld.setPrefWidth(200.0);
+        passFld.setPromptText("Password");
+        passFld.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        passFld.setStyle(
+            "-fx-background-color: #ffffff; " +
+            "-fx-text-fill: #1b1b1b; " +
+            "-fx-border-color: #626262; " +
+            "-fx-border-width: 1px; " +
+            "-fx-border-radius: 2px; " +
+            "-fx-prompt-text-fill: #737674;"
+        );
+
+        // Login button
+        loginBtn = new Button("Login");
+        loginBtn.setLayoutX(553.0);
+        loginBtn.setLayoutY(240.0);
+        loginBtn.setPrefWidth(100.0);
+        loginBtn.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        loginBtn.setStyle(
+            "-fx-background-color: #ffffff; " +
+            "-fx-text-fill: #1b1b1b; " +
+            "-fx-border-color: #626262; " +
+            "-fx-border-radius: 4px; " +
+            "-fx-background-radius: 4px; " +
+            "-fx-border-width: 1px;"
+        );
+        // Mouse-press effect
+        loginBtn.addEventFilter(MouseEvent.MOUSE_PRESSED, new EventHandler<MouseEvent>() {
+            @Override public void handle(MouseEvent e) {
+                loginBtn.setBackground(new Background(new BackgroundFill(
+                    Color.web("#c2c2c2"), new CornerRadii(4.0), Insets.EMPTY))); }
+        });
+        loginBtn.addEventFilter(MouseEvent.MOUSE_RELEASED, new EventHandler<MouseEvent>() {
+            @Override public void handle(MouseEvent e) {
+                loginBtn.setBackground(new Background(new BackgroundFill(
+                    Color.web("#ffffff"), new CornerRadii(4.0), Insets.EMPTY))); }
+        });
+        loginBtn.setOnAction(new EventHandler<ActionEvent>() {
+            @Override public void handle(ActionEvent e) {
+                String email = emailFld.getText().trim();
+                String pass  = passFld.getText();
+                String err   = controller.onLogin(email, pass);
+                msgLabel.setText(err != null ? err : "");
+            }
+        });
+
+        // “Need an account?” button
+        registerBtn = new Button("Need an account? Register");
+        registerBtn.setLayoutX(553.0);
+        registerBtn.setLayoutY(285.0);
+        registerBtn.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 12.0));
+        registerBtn.setStyle(
+            "-fx-background-color: transparent; " +
+            "-fx-text-fill: #1b1b1b; " +
+            "-fx-underline: true;"
+        );
+        registerBtn.setOnAction(new EventHandler<ActionEvent>() {
+            @Override public void handle(ActionEvent e) {
+                controller.goToRegister();
+            }
+        });
+
+        // Status message label
+        msgLabel = new Label(" ");
+        msgLabel.setLayoutX(553.0);
+        msgLabel.setLayoutY(330.0);
+        msgLabel.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        msgLabel.setTextFill(Color.RED);
+
+        // Field labels
+        Label emailLbl = new Label("E-mail:");
+        emailLbl.setLayoutX(460.0);
+        emailLbl.setLayoutY(167.0);
+        emailLbl.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        emailLbl.setTextFill(Color.web("#1b1b1b"));
+
+        Label passLbl = new Label("Password:");
+        passLbl.setLayoutX(460.0);
+        passLbl.setLayoutY(200.0);
+        passLbl.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        passLbl.setTextFill(Color.web("#1b1b1b"));
+
+        // Assemble
+        pane.getChildren().addAll(
+            emailLbl, emailFld,
+            passLbl,  passFld,
+            loginBtn, registerBtn,
+            msgLabel
+        );
     }
 
-    private void build() {
-        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        add(centered(new JLabel("Sign-in")));
-        add(Box.createRigidArea(new Dimension(0, 10)));
-
-        add(new JLabel("E-mail:"));
-        add(emailFld);
-        add(Box.createRigidArea(new Dimension(0, 10)));
-
-        add(new JLabel("Password:"));
-        add(passFld);
-        add(Box.createRigidArea(new Dimension(0, 15)));
-
-        add(loginBtn);
-        add(Box.createRigidArea(new Dimension(0, 5)));
-        add(registerBtn);
-        add(Box.createRigidArea(new Dimension(0, 15)));
-        add(msgLabel);
-
-        /* listeners */
-        loginBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
-        });
-        registerBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent e) { controller.goToRegister(); }
-        });
+    /** Expose the Pane so your JavaFX Application can embed it in a Scene. */
+    public Pane getPane() {
+        return pane;
     }
 
-    private void submit() {
-        String email = emailFld.getText().trim();
-        String pass  = new String(passFld.getPassword());
-        String err   = controller.onLogin(email, pass);
-        if (err != null) {
-            msgLabel.setText(err);
+    /**
+     * Convenience launcher if you want to test just this form standalone.
+     * You can delete this once you’re embedding into your main JavaFX App.
+     */
+    public static class Launcher extends javafx.application.Application {
+        @Override
+        public void start(Stage primaryStage) {
+            LoginController dummy = new LoginController(new Session(), null);
+            LoginPanel form = new LoginPanel(dummy);
+            primaryStage.setTitle("Sign-in");
+            primaryStage.setScene(new Scene(form.getPane()));
+            primaryStage.show();
         }
-    }
-
-    private Component centered(Component c) {
-        ((JComponent) c).setAlignmentX(Component.CENTER_ALIGNMENT);
-        return c;
+        public static void main(String[] args) {
+            Platform.setImplicitExit(true);
+            launch(args);
+        }
     }
 }
 "
 
 "MainApp.java: "
-"package com.example.breastcancer;
+"// File: src/main/java/com/example/breastcancer/MainApp.java
+package com.example.breastcancer;
 
 import java.awt.CardLayout;
-import java.util.List;
 import java.util.UUID;
+
 import javax.swing.JFrame;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -328,14 +446,17 @@ import javax.swing.UIManager;
 
 import com.google.gson.JsonObject;
 
+import javafx.embed.swing.JFXPanel;
+import javafx.application.Platform;
+import javafx.scene.Scene;
+
 /**
- * Application entry-point and simple screen-flow manager.
- * All screens live inside one CardLayout so we can jump
- * between them with cards.show(root, "name").
+ * Application entry-point and screen‐flow manager.
+ * Embeds the JavaFX Register/Login forms via JFXPanel,
+ * then swaps to Swing RiskFormPanel and ChatPanel.
  */
 public class MainApp extends JFrame {
 
-    /* ---------- navigation ---------- */
     private final CardLayout cards = new CardLayout();
     private final JPanel     root  = new JPanel(cards);
 
@@ -343,22 +464,11 @@ public class MainApp extends JFrame {
     private final Session                 session   = new Session();
     private final HttpApiClient           api       = new HttpApiClient();
     private final RiskCalculationService  service   = new RiskCalculationService(api);
+    private final String                  sessionId = UUID.randomUUID().toString().substring(0,8);
 
-    /* ---------- UI screens ---------- */
-    private RegisterPanel registerPanel;
-    private LoginPanel    loginPanel;
-    private RiskFormPanel riskFormPanel;
-    private ChatPanel     chatPanel;
-
-    /* ---------- controllers ---------- */
-    private RegisterController registerController;
-    private LoginController    loginController;
-    private RiskFormController riskFormController;
-    private ChatController     chatController;
-
-    /* ---------- misc ---------- */
-    private final String sessionId =
-        UUID.randomUUID().toString().substring(0, 8);
+    /* ---------- JavaFX wrappers ---------- */
+    private final JFXPanel registerFx = new JFXPanel();
+    private final JFXPanel loginFx    = new JFXPanel();
 
     public MainApp() {
         super("Breast-Cancer ChatBot");
@@ -366,66 +476,68 @@ public class MainApp extends JFrame {
         setSize(820, 640);
         setLocationRelativeTo(null);
 
+        // Kick-off JavaFX runtime
+        new JFXPanel();
+
         buildScreens();
         add(root);
-        cards.show(root, "register");          // first screen
+        cards.show(root, "register");
     }
 
-    /* ======================================================================
-     *  Build screens + wire controllers
-     * ====================================================================== */
     private void buildScreens() {
-        /* ---- register / login ---- */
-        registerController = new RegisterController(session, this);
-        registerPanel      = new RegisterPanel(registerController);
-        root.add(registerPanel, "register");
+        // --- REGISTER (JavaFX) ---
+        root.add(registerFx, "register");
+        Platform.runLater(new Runnable() {
+            @Override public void run() {
+                RegisterController rc = new RegisterController(session, MainApp.this);
+                RegisterPanel      p  = new RegisterPanel(rc);
+                registerFx.setScene(new Scene(p.getPane()));
+            }
+        });
 
-        loginController    = new LoginController(session, this);
-        loginPanel         = new LoginPanel(loginController);
-        root.add(loginPanel, "login");
+        // --- LOGIN (JavaFX) ---
+        root.add(loginFx, "login");
+        Platform.runLater(new Runnable() {
+            @Override public void run() {
+                LoginController lc = new LoginController(session, MainApp.this);
+                LoginPanel      p  = new LoginPanel(lc);
+                loginFx.setScene(new Scene(p.getPane()));
+            }
+        });
 
-        /* ---- risk form ---- */
-        riskFormController = new RiskFormController(service, session, this);
-        riskFormPanel      = new RiskFormPanel(riskFormController, session);
-        root.add(riskFormPanel, "form");
+        // --- RISK FORM (Swing) ---
+        RiskFormController rfc = new RiskFormController(service, session, this);
+        RiskFormPanel      rfp = new RiskFormPanel(rfc, session);
+        root.add(rfp, "risk");
+
+        // CHAT panel is created dynamically in onRiskSuccess()
     }
 
-    /* ======================================================================
-     *  Navigation helpers – invoked by controllers
-     * ====================================================================== */
-    public void showLoginPanel()     { cards.show(root, "login");     }
-    public void showRegisterPanel()  { cards.show(root, "register");  }
-
-    /** After successful sign-in. */
+    // Called by LoginController on successful login
     public void onLoginSuccess(String greeting) {
-        if (!session.getRiskCache().isEmpty()) {
-            showChat(session.getRiskCache(), greeting);   // user already has predictions
-        } else {
-            cards.show(root, "form");                     // need parameters first
-        }
+        cards.show(root, "risk");
     }
 
-    /** After /api/risk completes. */
+    // Called by RiskFormController after GAIL returns
     public void onRiskSuccess(JsonObject merged, String greeting) {
         session.addRisk(merged);
-        showChat(session.getRiskCache(), greeting);
-    }
-
-    /* ------------------------------------------------------------------ */
-    private void showChat(List<JsonObject> riskCache, String greeting) {
-        chatController = new ChatController(session, this);
-        chatPanel      = new ChatPanel(api, sessionId, riskCache, greeting);
-        root.add(chatPanel, "chat");
+        ChatPanel chatP = new ChatPanel(api, sessionId, session.getRiskCache(), greeting);
+        root.add(chatP, "chat");
         cards.show(root, "chat");
     }
 
-    /* ====================================================================== */
+    // Navigation helpers
+    public void showLoginPanel()    { cards.show(root, "login");    }
+    public void showRegisterPanel() { cards.show(root, "register"); }
+
     public static void main(String[] args) throws Exception {
         UIManager.setLookAndFeel(
             UIManager.getSystemLookAndFeelClassName()
         );
         SwingUtilities.invokeLater(new Runnable() {
-            public void run() { new MainApp().setVisible(true); }
+            @Override public void run() {
+                new MainApp().setVisible(true);
+            }
         });
     }
 }
@@ -467,76 +579,193 @@ public class RegisterController {
 "
 
 "RegisterPanel.java: "
-"package com.example.breastcancer;
+"// File: src/main/java/com/example/breastcancer/RegisterPanel.java
+package com.example.breastcancer;
 
-import java.awt.Component;
-import java.awt.Dimension;
-import javax.swing.Box;
-import javax.swing.BoxLayout;
-import javax.swing.JButton;
-import javax.swing.JComponent;
-import javax.swing.JLabel;
 import javax.swing.JPanel;
-import javax.swing.JPasswordField;
-import javax.swing.JTextField;
+
+import javafx.scene.layout.Pane;
+import javafx.scene.Scene;
+import javafx.scene.control.Label;
+import javafx.scene.control.TextField;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.Button;
+import javafx.scene.text.Font;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
+import javafx.scene.layout.CornerRadii;
+import javafx.geometry.Insets;
+import javafx.scene.paint.Color;
+import javafx.stage.Stage;
+import javafx.event.ActionEvent;
+import javafx.event.EventHandler;
+import javafx.application.Platform;
 
 /**
- * Very small form: e-mail + password + two buttons.
- * Uses anonymous inner classes (no lambdas) to stay beginner-friendly.
+ * JavaFX version of your RegisterPanel.
+ * Mirrors the styling and layout from WindowBuilder.java.
  */
-public class RegisterPanel extends JPanel {
+public class RegisterPanel{
 
     private final RegisterController controller;
+    private final Pane pane;
+    private final TextField emailFld;
+    private final PasswordField passFld;
+    private final Button registerBtn;
+    private final Button loginBtn;
+    private final Label msgLabel;
 
-    private final JTextField     emailFld   = new JTextField();
-    private final JPasswordField passFld    = new JPasswordField();
-    private final JButton        registerBtn= new JButton("Register");
-    private final JButton        loginBtn   = new JButton("Already registered? Sign-in");
-    private final JLabel         msgLabel   = new JLabel(" ");
+    public RegisterPanel(RegisterController controller) {
+        this.controller = controller;
 
-    public RegisterPanel(RegisterController c) {
-        controller = c;
-        build();
-    }
+        pane = new Pane();
+        pane.setPrefSize(1177, 600);
+        pane.setStyle("-fx-background-color: #eeeeee;");
 
-    private void build() {
-        setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-        add(centered(new JLabel("Create your account")));
-        add(Box.createRigidArea(new Dimension(0, 10)));
+        // E-mail field
+        emailFld = new TextField();
+        emailFld.setLayoutX(553.0);
+        emailFld.setLayoutY(162.0);
+        emailFld.setPrefWidth(200.0);
+        emailFld.setPromptText("E-mail");
+        emailFld.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        emailFld.setStyle(
+            "-fx-background-color: #ffffff; " +
+            "-fx-text-fill: #1b1b1b; " +
+            "-fx-border-color: #626262; " +
+            "-fx-border-width: 1px; " +
+            "-fx-border-radius: 2px; " +
+            "-fx-prompt-text-fill: #737674;"
+        );
 
-        add(new JLabel("E-mail:"));
-        add(emailFld);
-        add(Box.createRigidArea(new Dimension(0, 10)));
+        // Password field
+        passFld = new PasswordField();
+        passFld.setLayoutX(553.0);
+        passFld.setLayoutY(195.0);
+        passFld.setPrefWidth(200.0);
+        passFld.setPromptText("Password");
+        passFld.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        passFld.setStyle(
+            "-fx-background-color: #ffffff; " +
+            "-fx-text-fill: #1b1b1b; " +
+            "-fx-border-color: #626262; " +
+            "-fx-border-width: 1px; " +
+            "-fx-border-radius: 2px; " +
+            "-fx-prompt-text-fill: #737674;"
+        );
 
-        add(new JLabel("Password:"));
-        add(passFld);
-        add(Box.createRigidArea(new Dimension(0, 15)));
-
-        add(registerBtn);
-        add(Box.createRigidArea(new Dimension(0, 5)));
-        add(loginBtn);
-        add(Box.createRigidArea(new Dimension(0, 15)));
-        add(msgLabel);
-
-        /* listeners */
-        registerBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent e) { submit(); }
+        // Register button
+        registerBtn = new Button("Register");
+        registerBtn.setLayoutX(553.0);
+        registerBtn.setLayoutY(240.0);
+        registerBtn.setPrefWidth(100.0);
+        registerBtn.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        registerBtn.setStyle(
+            "-fx-background-color: #ffffff; " +
+            "-fx-text-fill: #1b1b1b; " +
+            "-fx-border-color: #626262; " +
+            "-fx-border-radius: 4px; " +
+            "-fx-background-radius: 4px; " +
+            "-fx-border-width: 1px;"
+        );
+        // Mouse-press effect
+        registerBtn.addEventFilter(MouseEvent.MOUSE_PRESSED, new EventHandler<MouseEvent>() {
+            @Override public void handle(MouseEvent e) {
+                registerBtn.setBackground(new Background(new BackgroundFill(
+                    Color.web("#c2c2c2"), new CornerRadii(4.0), Insets.EMPTY)));
+            }
         });
-        loginBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent e) { controller.goToLogin(); }
+        registerBtn.addEventFilter(MouseEvent.MOUSE_RELEASED, new EventHandler<MouseEvent>() {
+            @Override public void handle(MouseEvent e) {
+                registerBtn.setBackground(new Background(new BackgroundFill(
+                    Color.web("#ffffff"), new CornerRadii(4.0), Insets.EMPTY)));
+            }
         });
+        // Hook up to controller
+        registerBtn.setOnAction(new EventHandler<ActionEvent>() {
+            @Override public void handle(ActionEvent e) {
+                String email = emailFld.getText().trim();
+                String pass  = passFld.getText();
+                String msg   = controller.onRegister(email, pass);
+                msgLabel.setText(msg);
+            }
+        });
+
+        // “Already have an account?” button
+        loginBtn = new Button("Already registered? Sign-in");
+        loginBtn.setLayoutX(553.0);
+        loginBtn.setLayoutY(285.0);
+        loginBtn.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 12.0));
+        loginBtn.setStyle(
+            "-fx-background-color: transparent; " +
+            "-fx-text-fill: #1b1b1b; " +
+            "-fx-underline: true;"
+        );
+        loginBtn.setOnAction(new EventHandler<ActionEvent>() {
+            @Override public void handle(ActionEvent e) {
+                controller.goToLogin();
+            }
+        });
+
+        // Status message label
+        msgLabel = new Label(" ");
+        msgLabel.setLayoutX(553.0);
+        msgLabel.setLayoutY(330.0);
+        msgLabel.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        msgLabel.setTextFill(Color.RED);
+
+        // Field labels
+        Label emailLbl = new Label("E-mail:");
+        emailLbl.setLayoutX(460.0);
+        emailLbl.setLayoutY(167.0);
+        emailLbl.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        emailLbl.setTextFill(Color.web("#1b1b1b"));
+
+        Label passLbl = new Label("Password:");
+        passLbl.setLayoutX(460.0);
+        passLbl.setLayoutY(200.0);
+        passLbl.setFont(Font.loadFont(
+            getClass().getResourceAsStream("/resources/fonts/Lexend.ttf"), 14.0));
+        passLbl.setTextFill(Color.web("#1b1b1b"));
+
+        // Assemble
+        pane.getChildren().addAll(
+            emailLbl, emailFld,
+            passLbl,  passFld,
+            registerBtn, loginBtn,
+            msgLabel
+        );
     }
 
-    private void submit() {
-        String email = emailFld.getText().trim();
-        String pass  = new String(passFld.getPassword());
-        String msg   = controller.onRegister(email, pass);
-        msgLabel.setText(msg);
+    /** Expose the Pane so your JavaFX Application can embed it in a Scene. */
+    public Pane getPane() {
+        return pane;
     }
 
-    private Component centered(Component c) {
-        ((JComponent) c).setAlignmentX(Component.CENTER_ALIGNMENT);
-        return c;
+    /**
+     * Convenience launcher if you want to test just this form standalone.
+     * You can delete this once you’re embedding into your main JavaFX App.
+     */
+    public static class Launcher extends javafx.application.Application {
+        @Override
+        public void start(Stage primaryStage) {
+            RegisterController dummy = new RegisterController(new Session(), null);
+            RegisterPanel form = new RegisterPanel(dummy);
+            primaryStage.setTitle("Create your account");
+            primaryStage.setScene(new Scene(form.getPane()));
+            primaryStage.show();
+        }
+        public static void main(String[] args) {
+            Platform.setImplicitExit(true);
+            launch(args);
+        }
     }
 }
 "
@@ -665,13 +894,15 @@ public class RiskFormController {
 "
 
 "RiskFormPanel.java: "
-"package com.example.breastcancer;
+"// File: src/main/java/com/example/breastcancer/RiskFormPanel.java
+package com.example.breastcancer;
 
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.Font;
+
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -684,76 +915,121 @@ import javax.swing.JSpinner;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingConstants;
 
+/**
+ * Swing form for collecting breast-cancer risk parameters.
+ */
 public class RiskFormPanel extends JPanel {
-    public static final int[] RACE_VALUES = { 1, 2, 3, 7, 8, 9, 10, 11, 12 };
+    public static final int[] RACE_VALUES = {
+        1, 2, 3, 7, 8, 9, 10, 11, 12
+    };
+
     private final RiskFormController controller;
-    private Session session;
-    private JSpinner ageSpinner;
-    private JComboBox<String> menarchBox, liveBirthBox, biopsyBox, numBiopsyBox, ihypBox, relativesBox, raceBox;
-    private JPanel biopsyDetails;
-    private JButton submitBtn;
-    private JLabel errorLabel;
+    private final Session            session;
+    private JSpinner                  ageSpinner;
+    private JComboBox<String>        menarchBox,
+                                    liveBirthBox,
+                                    biopsyBox,
+                                    numBiopsyBox,
+                                    ihypBox,
+                                    relativesBox,
+                                    raceBox;
+    private JPanel                    biopsyDetails;
+    private JButton                   submitBtn;
+    private JLabel                    errorLabel;
+
     public RiskFormPanel(RiskFormController controller, Session session) {
-        this.session = session;
         this.controller = controller;
+        this.session    = session;
         build();
     }
+
     private void build() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
+
         add(centeredLabel("Breast Cancer Risk Parameters", 18f));
+
         ageSpinner = new JSpinner(new SpinnerNumberModel(48, 35, 85, 1));
         add(labeled("Woman’s current age (35–85):", ageSpinner));
+
         menarchBox = new JComboBox<>(new String[]{
-            "≥ 14 yrs / Unknown", "12 – 13 yrs", "7 – 11 yrs"
+            "≥ 14 yrs / Unknown",
+            "12 – 13 yrs",
+            "7 – 11 yrs"
         });
         add(labeled("Age at first period:", menarchBox));
+
         liveBirthBox = new JComboBox<>(new String[]{
-            "Unknown or < 20 yrs", "20 – 24 yrs", "25 – 29 yrs or No births", "≥ 30 yrs"
+            "Unknown or < 20 yrs",
+            "20 – 24 yrs",
+            "25 – 29 yrs or No births",
+            "≥ 30 yrs"
         });
         add(labeled("Age at first live birth:", liveBirthBox));
-        biopsyBox = new JComboBox<>(new String[]{"No / Unknown", "Yes"});
+
+        biopsyBox = new JComboBox<>(new String[]{
+            "No / Unknown",
+            "Yes"
+        });
         add(labeled("Ever had biopsy?", biopsyBox));
+
         biopsyDetails = new JPanel();
         biopsyDetails.setLayout(new BoxLayout(biopsyDetails, BoxLayout.Y_AXIS));
         numBiopsyBox = new JComboBox<>(new String[]{
-            "0 biopsies", "1 biopsy or unknown count", "> 1 biopsy"
+            "0 biopsies",
+            "1 biopsy or unknown count",
+            "> 1 biopsy"
         });
         ihypBox = new JComboBox<>(new String[]{
-            "No atypical hyperplasia", "Yes", "Unknown / Not applicable"
+            "No atypical hyperplasia",
+            "Yes",
+            "Unknown / Not applicable"
         });
         biopsyDetails.add(labeled("Number of biopsies:", numBiopsyBox));
         biopsyDetails.add(labeled("Atypical hyperplasia?", ihypBox));
         add(biopsyDetails);
         biopsyDetails.setVisible(false);
-        // Anonymous inner class (no lambdas) to toggle biopsy detail panel
+
         biopsyBox.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
+            @Override public void actionPerformed(java.awt.event.ActionEvent evt) {
                 biopsyDetails.setVisible(biopsyBox.getSelectedIndex() == 1);
             }
         });
+
         relativesBox = new JComboBox<>(new String[]{
-            "0 relatives / Unknown", "1", "> 1"
+            "0 relatives / Unknown",
+            "1",
+            "> 1"
         });
         add(labeled("First-degree relatives with breast cancer:", relativesBox));
+
         raceBox = new JComboBox<>(new String[]{
-            "White / Unknown / American-Indian", "African-American", "Hispanic",
-            "Chinese", "Japanese", "Filipino", "Hawaiian",
-            "Other Pacific Islander", "Other Asian-American"
+            "White / Unknown / American-Indian",
+            "African-American",
+            "Hispanic",
+            "Chinese",
+            "Japanese",
+            "Filipino",
+            "Hawaiian",
+            "Other Pacific Islander",
+            "Other Asian-American"
         });
         add(labeled("Race / Ethnicity:", raceBox));
+
         errorLabel = new JLabel(" ");
         errorLabel.setForeground(Color.RED);
         add(errorLabel);
+
         submitBtn = new JButton("Calculate Risk");
         submitBtn.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
+            @Override public void actionPerformed(java.awt.event.ActionEvent evt) {
                 submit();
             }
         });
         add(Box.createRigidArea(new Dimension(0, 10)));
         add(submitBtn);
     }
+
     private JLabel centeredLabel(String text, float size) {
         JLabel lbl = new JLabel(text, SwingConstants.CENTER);
         lbl.setAlignmentX(Component.CENTER_ALIGNMENT);
@@ -761,6 +1037,7 @@ public class RiskFormPanel extends JPanel {
         lbl.setBorder(BorderFactory.createEmptyBorder(0, 0, 15, 0));
         return lbl;
     }
+
     private JPanel labeled(String label, JComponent comp) {
         JPanel p = new JPanel(new BorderLayout());
         p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
@@ -770,7 +1047,7 @@ public class RiskFormPanel extends JPanel {
         p.add(comp, BorderLayout.CENTER);
         return p;
     }
-    // ACTION LISTENER HELPER
+
     private void submit() {
         int age = ((Integer) ageSpinner.getValue()).intValue();
         if (age < 35 || age > 85) {
@@ -779,10 +1056,12 @@ public class RiskFormPanel extends JPanel {
         }
         errorLabel.setText("Calculating…");
         submitBtn.setEnabled(false);
+
         RiskInput input = new RiskInput();
         input.setAge(age);
         input.setMenarchAgeIndex(menarchBox.getSelectedIndex());
         input.setLiveBirthAgeIndex(liveBirthBox.getSelectedIndex());
+
         int biopsyIdx = biopsyBox.getSelectedIndex();
         input.setBiopsyIndex(biopsyIdx);
         if (biopsyIdx == 0) {
@@ -791,19 +1070,21 @@ public class RiskFormPanel extends JPanel {
         } else {
             input.setNumBiopsyIndex(numBiopsyBox.getSelectedIndex());
             int ihypVal = ihypBox.getSelectedIndex();
-            if (ihypVal == 2) {
-                ihypVal = 99;
-            }
+            if (ihypVal == 2) ihypVal = 99;
             input.setIhypIndex(ihypVal);
         }
+
         input.setRelativesIndex(relativesBox.getSelectedIndex());
         input.setRaceCode(RACE_VALUES[raceBox.getSelectedIndex()]);
+
         controller.onSubmit(input);
     }
+
     public void enableSubmitButton() {
         submitBtn.setEnabled(true);
     }
-}"
+}
+"
 
 "RiskInput.java: "
 "package com.example.breastcancer;
@@ -847,6 +1128,27 @@ public class RiskInput {
 
     public int getRaceCode() { return raceCode; }
     public void setRaceCode(int raceCode) { this.raceCode = raceCode; }
+
+    /**
+     * 
+     * Traditional ML <---
+     * ***
+     * 
+     * Race or Age <--- Smoking ..... higher weightage
+     * 
+     * 1. Explain the work
+     * any question, know everything
+     * entire code
+     * gail inner workings
+     * live code discussion (line of code - reference to explaination)
+     * explain clearly, audience!!!
+     * 1 week
+     * you have to own it
+     * 
+     * Next session: 
+     * 
+     * @return
+     */
 
     /* ───── derived helpers required by RiskAssessmentService ───── */
     public int  getMenarchAgeCode()          { return menarchAgeIndex;            }

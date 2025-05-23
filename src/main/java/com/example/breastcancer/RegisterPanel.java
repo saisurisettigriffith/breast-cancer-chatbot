@@ -12,6 +12,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;           // ← NEW
+import javafx.scene.image.ImageView;      // ← NEW
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
@@ -24,12 +26,9 @@ import javafx.stage.Stage;
 /**
  * JavaFX version of your RegisterPanel.
  * Mirrors the styling and layout from WindowBuilder.java.
- * <p>
- * Updated (23 May 2025):
- * <ul>
- *   <li>Added {@link #loadFont(double)} with graceful fallback
- *       (same rationale as in {@code LoginPanel}).</li>
- * </ul>
+ *
+ * Added (24 May 2025):
+ *  • loadImage(..) helper + ImageView logo on the left-hand side.
  */
 public class RegisterPanel {
 
@@ -40,8 +39,9 @@ public class RegisterPanel {
     private final Button             registerBtn;
     private final Button             loginBtn;
     private final Label              msgLabel;
+    private final ImageView          logoView;   // ← NEW
 
-    /* ───────────────────────────────────────── helper ───────────────────────────────────────── */
+    /* ───────────────────────────────────────── helpers ──────────────────────────────────────── */
     /** Try to load “fonts/Lexend.ttf”; return system font if absent. */
     private Font loadFont(double size) {
         try {
@@ -50,11 +50,18 @@ public class RegisterPanel {
                 Font f = Font.loadFont(in, size);
                 if (f != null) return f;
             }
-        } catch (Exception ex) {
-            /* ignore – fall through */
-        }
+        } catch (Exception ignore) { /* fall through */ }
         return Font.font("System", size);
     }
+
+    /** Try to load an image from resources; return null if not found. */           // ← NEW
+    private Image loadImage(String path) {                                         // ← NEW
+        try {                                                                      // ← NEW
+            InputStream in = getClass().getResourceAsStream(path);                 // ← NEW
+            if (in != null) return new Image(in);                                  // ← NEW
+        } catch (Exception ignore) { /* fall through */ }                          // ← NEW
+        return null;                                                               // ← NEW
+    }                                                                              // ← NEW
 
     /* ───────────────────────────────────────── constructor ──────────────────────────────────── */
     public RegisterPanel(RegisterController controller) {
@@ -63,6 +70,20 @@ public class RegisterPanel {
         pane = new Pane();
         pane.setPrefSize(1177, 600);
         pane.setStyle("-fx-background-color: #eeeeee;");
+
+        /* ---------------- logo (left side) ---------------- */                    // ← NEW
+        Image img = loadImage("/logo.png");                                 // ← NEW
+        if (img != null) {                                                         // ← NEW
+            logoView = new ImageView(img);                                         // ← NEW
+            logoView.setPreserveRatio(true);                                       // ← NEW
+            logoView.setFitWidth(250.0);  // shrink / enlarge as you like          // ← NEW
+            logoView.setLayoutX(80.0);                                              // ← NEW
+            logoView.setLayoutY(120.0);                                             // ← NEW
+            pane.getChildren().add(logoView);                                       // ← NEW
+        } else {                                                                   // ← NEW
+            logoView = null; /* file missing – silently continue */                // ← NEW
+            System.err.println("⚠️ could not load logo.png – check your resources folder");
+        }                                                                          // ← NEW
 
         /* ---------------- e-mail field ---------------- */
         emailFld = new TextField();
@@ -182,10 +203,7 @@ public class RegisterPanel {
         return pane;
     }
 
-    /**
-     * Convenience launcher for standalone testing.
-     * You may delete this once embedded in MainApp.
-     */
+    /* ---------------- standalone test launcher (unchanged) ---------------- */
     public static class Launcher extends javafx.application.Application {
         @Override
         public void start(Stage primaryStage) {

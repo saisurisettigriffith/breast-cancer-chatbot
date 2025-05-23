@@ -12,6 +12,8 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
 import javafx.scene.control.TextField;
+import javafx.scene.image.Image;           // ← NEW
+import javafx.scene.image.ImageView;      // ← NEW
 import javafx.scene.input.MouseEvent;
 import javafx.scene.layout.Background;
 import javafx.scene.layout.BackgroundFill;
@@ -24,14 +26,8 @@ import javafx.stage.Stage;
 /**
  * JavaFX version of your LoginPanel.
  * Mirrors styling/layout from RegisterPanel and WindowBuilder.
- * <p>
- * Updated (23 May 2025):
- * <ul>
- *   <li>Introduced {@link #loadFont(double)} to load “Lexend.ttf”
- *       safely and fall back to the default system font if the
- *       resource is not found – this prevents the NPE seen at
- *       runtime when the font file is missing.</li>
- * </ul>
+ *
+ * Added logo on the left, same as RegisterPanel.
  */
 public class LoginPanel {
 
@@ -42,6 +38,7 @@ public class LoginPanel {
     private final Button          loginBtn;
     private final Button          registerBtn;
     private final Label           msgLabel;
+    private final ImageView       logoView;   // ← NEW
 
     /* ───────────────────────────────────────── helper ───────────────────────────────────────── */
     /** Try to load “fonts/Lexend.ttf”; return system font if absent. */
@@ -58,6 +55,15 @@ public class LoginPanel {
         return Font.font("System", size);
     }
 
+    /** Try to load an image from resources; return null if not found. */
+    private Image loadImage(String path) {
+        try {
+            InputStream in = getClass().getResourceAsStream(path);
+            if (in != null) return new Image(in);
+        } catch (Exception ignore) { /* fall through */ }
+        return null;
+    }
+
     /* ───────────────────────────────────────── constructor ──────────────────────────────────── */
     public LoginPanel(LoginController controller) {
         this.controller = controller;
@@ -65,6 +71,20 @@ public class LoginPanel {
         pane = new Pane();
         pane.setPrefSize(1177, 600);
         pane.setStyle("-fx-background-color: #eeeeee;");
+
+        /* ---------------- logo (left side) ---------------- */
+        Image img = loadImage("/logo.png");                                    // ← adjust to match RegisterPanel
+        if (img != null) {
+            logoView = new ImageView(img);
+            logoView.setPreserveRatio(true);
+            logoView.setFitWidth(250.0);                                        // ← same width as RegisterPanel
+            logoView.setLayoutX(80.0);
+            logoView.setLayoutY(120.0);
+            pane.getChildren().add(logoView);
+        } else {
+            logoView = null; /* file missing – silently continue */
+            System.err.println("⚠️ could not load logo.png – check your resources folder");
+        }
 
         /* ---------------- e-mail field ---------------- */
         emailFld = new TextField();
@@ -172,9 +192,9 @@ public class LoginPanel {
 
         /* ---------------- assemble ---------------- */
         pane.getChildren().addAll(
-            emailLbl, emailFld,
-            passLbl,  passFld,
-            loginBtn, registerBtn,
+            emailLbl,   emailFld,
+            passLbl,    passFld,
+            loginBtn,   registerBtn,
             msgLabel
         );
     }

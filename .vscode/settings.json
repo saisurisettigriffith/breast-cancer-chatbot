@@ -3,6 +3,7 @@
     // never auto-attach to a .git in any parent folder
     "git.openRepositoryInParentFolders": "never",          
     // only detect the repo that lives in your workspace root
-    "git.autoRepositoryDetection": false
+    "git.autoRepositoryDetection": false,
+    "java.compile.nullAnalysis.mode": "automatic"
 }
 

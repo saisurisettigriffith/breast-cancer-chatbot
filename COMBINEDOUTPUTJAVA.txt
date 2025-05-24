@@ -15,6 +15,8 @@ public class ChatController {
 package com.example.breastcancer;
 
 import java.awt.BorderLayout;
+import java.awt.Color;
+import java.awt.FlowLayout;
 import java.util.List;
 
 import javax.swing.BorderFactory;
@@ -30,46 +32,67 @@ import com.google.gson.JsonObject;
 
 /**
  * Simple Swing chat UI that posts to your /api/chat endpoint.
+ *
+ * Added (23 May 2025):
+ *  • Consistent #eeeeee background.
+ *  • “Redo Assessment” button (goes back to Risk Form).
+ *  • “Logout” button (returns to Login screen and clears session).
  */
 public class ChatPanel extends JPanel {
 
     private final HttpApiClient        api;
     private final String               sessionId;
     private final List<JsonObject>     riskCache;
+    private final MainApp              mainApp;      // ← NEW
 
-    private final JTextArea  chatArea = new JTextArea();
-    private final JTextField inputFld = new JTextField();
-    private final JButton    sendBtn  = new JButton("Send");
-    private final JButton    gailBtn  = new JButton("Refill Form");
+    private final JTextArea  chatArea   = new JTextArea();
+    private final JTextField inputFld   = new JTextField();
+    private final JButton    sendBtn    = new JButton("Send");
+    private final JButton    redoBtn    = new JButton("Redo Assessment"); // ← renamed
+    private final JButton    logoutBtn  = new JButton("Logout");          // ← NEW
 
     private final Gson gson = new Gson();
 
     public ChatPanel(HttpApiClient api,
                      String sessionId,
                      List<JsonObject> riskCache,
-                     String greeting) {
+                     String greeting,
+                     MainApp mainApp) {         // ← NEW param
         this.api       = api;
         this.sessionId = sessionId;
         this.riskCache = riskCache;
+        this.mainApp   = mainApp;
         build(greeting);
     }
 
     private void build(String greeting) {
         setLayout(new BorderLayout(10,10));
         setBorder(BorderFactory.createEmptyBorder(10,10,10,10));
+        setBackground(new Color(0xeeeeee));              // ← uniform style
 
+        /* ---------------- navigation bar (top) ---------------- */
+        JPanel nav = new JPanel(new FlowLayout(FlowLayout.RIGHT, 8, 0));
+        nav.setOpaque(false);
+        nav.add(redoBtn);
+        nav.add(logoutBtn);
+        add(nav, BorderLayout.NORTH);
+
+        /* ---------------- chat area (centre) ---------------- */
         chatArea.setEditable(false);
         chatArea.setLineWrap(true);
         chatArea.setWrapStyleWord(true);
         add(new JScrollPane(chatArea), BorderLayout.CENTER);
 
+        /* ---------------- bottom input area ---------------- */
         JPanel bottom = new JPanel(new BorderLayout(5,5));
+        bottom.setOpaque(false);
         bottom.add(inputFld, BorderLayout.CENTER);
         bottom.add(sendBtn,  BorderLayout.EAST);
         add(bottom, BorderLayout.SOUTH);
 
         appendAssistant(greeting);
 
+        /* ---- listeners ---- */
         sendBtn.addActionListener(new java.awt.event.ActionListener() {
             @Override public void actionPerformed(java.awt.event.ActionEvent e) {
                 submit();
@@ -80,12 +103,21 @@ public class ChatPanel extends JPanel {
                 submit();
             }
         });
-        gailBtn.addActionListener(new java.awt.event.ActionListener() {
+        redoBtn.addActionListener(new java.awt.event.ActionListener() {
             @Override public void actionPerformed(java.awt.event.ActionEvent e) {
-                // you could jump back to the form here if you like
+                /* Jump back to the risk-assessment form */
+                mainApp.showRiskPanel();
+            }
+        });
+        logoutBtn.addActionListener(new java.awt.event.ActionListener() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent e) {
+                /* Clear session and return to sign-in */
+                mainApp.logout();
             }
         });
     }
+
+    /* ---------------- network helper ---------------- */
 
     private void submit() {
         final String msg = inputFld.getText().trim();
@@ -112,6 +144,8 @@ public class ChatPanel extends JPanel {
             }
         }.execute();
     }
+
+    /* ---------------- helpers ---------------- */
 
     private void appendUser(String txt)      { chatArea.append("You: " + txt + "\n\n"); }
     private void appendAssistant(String txt) { chatArea.append("Bot: " + txt + "\n\n"); }
@@ -479,6 +513,11 @@ public class LoginPanel {
  * File: src/main/java/com/example/breastcancer/MainApp.java
  * Shows the risk form only for first-time users;
  * returning users jump straight to the chat.
+ *
+ * Added (23 May 2025):
+ *  • showRiskPanel() helper so ChatPanel can trigger “Redo Assessment”.
+ *  • logout() helper clears current Session and returns to Login.
+ *  • ChatPanel constructor updated to accept MainApp reference.
  * ──────────────────────────────────────────── */
 package com.example.breastcancer;
 
@@ -560,8 +599,7 @@ public class MainApp extends JFrame {
         if (session.getRiskCache().isEmpty()) {
             cards.show(root, "risk");
         } else {
-            ChatPanel chatP = new ChatPanel(
-                api, sessionId, session.getRiskCache(), greeting);
+            ChatPanel chatP = new ChatPanel(api, sessionId, session.getRiskCache(), greeting, this); // ← pass MainApp
             root.add(chatP, "chat");
             cards.show(root, "chat");
         }
@@ -570,15 +608,21 @@ public class MainApp extends JFrame {
     /* Called by RiskFormController after GAIL returns */
     public void onRiskSuccess(JsonObject merged, String greeting) {
         session.addRisk(merged);  /* also persists to Mongo */
-        ChatPanel chatP = new ChatPanel(api, sessionId,
-                                        session.getRiskCache(), greeting);
+        ChatPanel chatP = new ChatPanel(api, sessionId, session.getRiskCache(), greeting, this); // ← pass MainApp
         root.add(chatP, "chat");
         cards.show(root, "chat");
     }
 
-    /* Navigation helpers */
+    /* ---------- navigation helpers ---------- */
     public void showLoginPanel()    { cards.show(root, "login");    }
     public void showRegisterPanel() { cards.show(root, "register"); }
+    public void showRiskPanel()     { cards.show(root, "risk"); }     // ← NEW
+
+    /** Clears the current session and returns to the Login screen. */
+    public void logout() {
+        session.logout();
+        cards.show(root, "login");
+    }
 
     public static void main(String[] args) throws Exception {
         UIManager.setLookAndFeel(
@@ -904,6 +948,9 @@ import com.google.gson.JsonObject;
 /**
  * Orchestrates form → API → UI flow.
  * No interface needed—calls back to MainApp directly.
+ *
+ * Added (23 May 2025):
+ *  • {@link #onLogout()} helper invoked by RiskFormPanel.
  */
 public class RiskFormController {
 
@@ -972,6 +1019,11 @@ public class RiskFormController {
             }
         }.execute();
     }
+
+    /* Invoked by RiskFormPanel when the user clicks “Logout”. */
+    public void onLogout() {
+        mainApp.logout();
+    }
 }
 "
 
@@ -999,6 +1051,10 @@ import javax.swing.SwingConstants;
 
 /**
  * Swing form for collecting breast-cancer risk parameters.
+ *
+ * Added (23 May 2025):
+ *  • Consistent #eeeeee background.
+ *  • Top-right “Logout” button that returns to Login.
  */
 public class RiskFormPanel extends JPanel {
     public static final int[] RACE_VALUES = {
@@ -1007,17 +1063,18 @@ public class RiskFormPanel extends JPanel {
 
     private final RiskFormController controller;
     private final Session            session;
-    private JSpinner                  ageSpinner;
+    private JSpinner                 ageSpinner;
     private JComboBox<String>        menarchBox,
-                                    liveBirthBox,
-                                    biopsyBox,
-                                    numBiopsyBox,
-                                    ihypBox,
-                                    relativesBox,
-                                    raceBox;
-    private JPanel                    biopsyDetails;
-    private JButton                   submitBtn;
-    private JLabel                    errorLabel;
+                                     liveBirthBox,
+                                     biopsyBox,
+                                     numBiopsyBox,
+                                     ihypBox,
+                                     relativesBox,
+                                     raceBox;
+    private JPanel                   biopsyDetails;
+    private JButton                  submitBtn;
+    private JButton                  logoutBtn;     // ← NEW
+    private JLabel                   errorLabel;
 
     public RiskFormPanel(RiskFormController controller, Session session) {
         this.controller = controller;
@@ -1028,6 +1085,20 @@ public class RiskFormPanel extends JPanel {
     private void build() {
         setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
         setBorder(BorderFactory.createEmptyBorder(20, 40, 20, 40));
+        setBackground(new Color(0xeeeeee));               // ← uniform style
+
+        /* ---- navigation bar ---- */
+        JPanel nav = new JPanel(new BorderLayout());
+        nav.setOpaque(false);
+        logoutBtn = new JButton("Logout");
+        logoutBtn.addActionListener(new java.awt.event.ActionListener() {
+            @Override public void actionPerformed(java.awt.event.ActionEvent evt) {
+                controller.onLogout();
+            }
+        });
+        nav.add(logoutBtn, BorderLayout.EAST);
+        nav.setMaximumSize(new Dimension(Integer.MAX_VALUE, 35));
+        add(nav);
 
         add(centeredLabel("Breast Cancer Risk Parameters", 18f));
 
@@ -1057,6 +1128,7 @@ public class RiskFormPanel extends JPanel {
 
         biopsyDetails = new JPanel();
         biopsyDetails.setLayout(new BoxLayout(biopsyDetails, BoxLayout.Y_AXIS));
+        biopsyDetails.setOpaque(false);
         numBiopsyBox = new JComboBox<>(new String[]{
             "0 biopsies",
             "1 biopsy or unknown count",
@@ -1123,6 +1195,7 @@ public class RiskFormPanel extends JPanel {
     private JPanel labeled(String label, JComponent comp) {
         JPanel p = new JPanel(new BorderLayout());
         p.setMaximumSize(new Dimension(Integer.MAX_VALUE, 40));
+        p.setOpaque(false);
         JLabel l = new JLabel(label);
         l.setPreferredSize(new Dimension(280, 28));
         p.add(l, BorderLayout.WEST);
@@ -1353,6 +1426,10 @@ import com.mongodb.client.MongoDatabase;
  * Keeps track of the logged-in user, performs register / sign-in
  * via Firebase Auth REST API, and stores user-specific
  * risk data in MongoDB so it is available next time.
+ *
+ * Added (23 May 2025):
+ *  • {@link #logout()} clears credentials and in-memory cache so
+ *    the UI can return to the sign-in screen cleanly.
  */
 public class Session {
 
@@ -1378,8 +1455,8 @@ public class Session {
     private static boolean                   mongoReady = false;
 
     /* ───────────────── per-user state ───────────────────── */
-    private Credentials          credentials;
-    private boolean              loggedIn  = false;
+    private Credentials            credentials;
+    private boolean                loggedIn  = false;
     private final List<JsonObject> riskCache = new ArrayList<>();
 
     /* ───────────────── constructor ──────────────────────── */
@@ -1450,7 +1527,7 @@ public class Session {
         }
     }
 
-    /** Load any prior risk entries for the user into riskCache. */
+    /** Load any prior risk entries for the user into {@link #riskCache}. */
     private void loadUserRiskCache() {
         riskCache.clear();
         if (!mongoReady || credentials == null) { return; }
@@ -1505,6 +1582,16 @@ public class Session {
         return ok;
     }
 
+    /**
+     * Clear credentials and cached data so the UI can show the
+     * Login screen in a pristine state.
+     */
+    public void logout() {
+        this.loggedIn    = false;
+        this.credentials = null;
+        this.riskCache.clear();
+    }
+
     public boolean isLoggedIn()             { return loggedIn; }
     public List<JsonObject> getRiskCache()  { return riskCache; }
 
@@ -1536,7 +1623,8 @@ public class Session {
             return false;
         }
     }
-}"
+}
+"
 
 "combine.py: "
 "import os

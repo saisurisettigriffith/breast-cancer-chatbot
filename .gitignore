@@ -1,0 +1,15 @@
+# ignore any generated JSON creds in target/classes
+target/
+resources/
+out/
+runtime-image/
+COMBINEDOUTPUTJAVA.txt
+entitlements.plist
+package_macos_app.sh
+WORKINGJAVACODEBASE.txt
+# ignore your combine.py script
+src/main/java/com/example/breastcancer/combine.py
+GUIBuilder/
+# ignore emoji_remove.py script
+src/main/java/com/example/breastcancer/emoji_remove.py
+.vscode/

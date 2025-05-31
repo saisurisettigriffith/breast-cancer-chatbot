@@ -16,3 +16,9 @@ public class RiskCalculationService {
         return mapper.toDomain(input, res);
     }
 }
+
+/**
+ * Format conversion logic and Getters/Setters for RiskInput and RiskResult.
+ * Nothing big here... it is just complicated mandatory labor work.
+ * Just following SOLID principles and keeping the code clean.
+ */

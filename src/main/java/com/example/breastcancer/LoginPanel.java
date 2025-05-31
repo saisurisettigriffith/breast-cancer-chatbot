@@ -2,11 +2,9 @@ package com.example.breastcancer;
 
 import java.io.InputStream;
 
-import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
@@ -20,7 +18,6 @@ import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
-import javafx.stage.Stage;
 
 public class LoginPanel {
 
@@ -53,6 +50,7 @@ public class LoginPanel {
             if (in != null)
                 return new Image(in);
         } catch (Exception ignore) {
+
         }
         return null;
     }
@@ -187,20 +185,20 @@ public class LoginPanel {
     public Pane getPane() {
         return pane;
     }
-
-    public static class Launcher extends javafx.application.Application {
-        @Override
-        public void start(Stage primaryStage) {
-            LoginController dummy = new LoginController(new Session(), null);
-            LoginPanel form = new LoginPanel(dummy);
-            primaryStage.setTitle("Sign-in");
-            primaryStage.setScene(new Scene(form.getPane()));
-            primaryStage.show();
-        }
-
-        public static void main(String[] args) {
-            Platform.setImplicitExit(true);
-            launch(args);
-        }
-    }
 }
+
+/**
+ * LoginPanel builds the JavaFX UI for user login: styling, fields, buttons, and logo.
+ *
+ *   constructor and getPane() are called by:
+ *       MainApp.buildScreens()
+ *
+ *   Once MainApp embeds this Pane into a JFXPanel and displays it,
+ *   JavaFX’s event handling takes over:
+ *     - EventHandler<ActionEvent> on loginBtn calls controller.onLogin(...)
+ *     - EventHandler<ActionEvent> on registerBtn calls controller.goToRegister()
+ *
+ *   The LoginPanel itself only sets up layout, styling, and event wiring;
+ *   it relies on the injected LoginController and MainApp to handle all
+ *   authentication logic and navigation whenever the panel is shown.
+ */

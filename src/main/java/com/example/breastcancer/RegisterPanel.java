@@ -2,11 +2,9 @@ package com.example.breastcancer;
 
 import java.io.InputStream;
 
-import javafx.application.Platform;
 import javafx.event.ActionEvent;
 import javafx.event.EventHandler;
 import javafx.geometry.Insets;
-import javafx.scene.Scene;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.PasswordField;
@@ -20,7 +18,6 @@ import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
 import javafx.scene.text.Font;
-import javafx.stage.Stage;
 
 public class RegisterPanel {
 
@@ -42,6 +39,7 @@ public class RegisterPanel {
                     return f;
             }
         } catch (Exception ignore) {
+
         }
         return Font.font("System", size);
     }
@@ -52,6 +50,7 @@ public class RegisterPanel {
             if (in != null)
                 return new Image(in);
         } catch (Exception ignore) {
+
         }
         return null;
     }
@@ -186,20 +185,19 @@ public class RegisterPanel {
     public Pane getPane() {
         return pane;
     }
-
-    public static class Launcher extends javafx.application.Application {
-        @Override
-        public void start(Stage primaryStage) {
-            RegisterController dummy = new RegisterController(new Session(), null);
-            RegisterPanel form = new RegisterPanel(dummy);
-            primaryStage.setTitle("Create your account");
-            primaryStage.setScene(new Scene(form.getPane()));
-            primaryStage.show();
-        }
-
-        public static void main(String[] args) {
-            Platform.setImplicitExit(true);
-            launch(args);
-        }
-    }
 }
+
+/**
+ * RegisterPanel builds the JavaFX UI for user registration: styling, fields, buttons, and logo.
+ *
+ *   constructor and getPane() are called by:
+ *       MainApp.buildScreens()
+ *
+ *   Once embedded into a JFXPanel and displayed, JavaFX’s event handling takes over:
+ *     - EventHandler<ActionEvent> on registerBtn calls controller.onRegister(...)
+ *     - EventHandler<ActionEvent> on loginBtn calls controller.goToLogin()
+ *
+ *   RegisterPanel sets up layout, styling, and event wiring; it relies on the injected
+ *   RegisterController and MainApp to handle account creation logic and navigation
+ *   whenever the panel is shown.
+ */

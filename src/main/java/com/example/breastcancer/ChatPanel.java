@@ -67,6 +67,16 @@ public class ChatPanel extends JPanel {
 
         appendAssistant(greeting);
 
+        /**
+         * External - RegisterPanel.java, LoginPanel.java: JavaFX uses...
+         * ...EventHandler<T extends Event> for all events.
+         * 
+         * HERE HOWEVER, Swing uses specific...
+         * ...listener interfaces (ActionListener) for events.
+         * 
+         * Both handle similar events, but with different APIs.
+         */
+
         sendBtn.addActionListener(new java.awt.event.ActionListener() {
             @Override
             public void actionPerformed(java.awt.event.ActionEvent e) {
@@ -119,6 +129,54 @@ public class ChatPanel extends JPanel {
                 JsonObject res = api.postChat(body);
                 answer = res.get("answer").getAsString();
                 return null;
+                /**
+                 * This is where we send the request to the Flask back-end.
+                 * We see another .postChat(body) method call,
+                 * which is similar to the one in RiskCalculationService.java.
+                 * 
+                 * However, here we are sending a chat message
+                 * to the Flask back-end, which will process it
+                 * and return a response.
+                 * 
+                 * The body (JsonObject) contains:
+                 * - session_id: the current session ID
+                 * - riskData: the cached risk data from the risk assessment
+                 * - input: the user's message
+                 * 
+                 * The Flask back-end will process this data,
+                 * generate a response, and return it as a JsonObject.
+                 * 
+                 * You can see we saved it into a variable called <res>
+                 * 
+                 * This variable contains the response from the Flask back-end,
+                 * which includes the assistant's reply to the user's message.
+                 * 
+                 * This is all possible because we have a
+                 * variable called <api> of type HttpApiClient
+                 * injected into this class.
+                 * 
+                 * api takes in JsonObject and res is returned with a JsonObject as well,
+                 * but this time it contains the assistant's response.
+                 * 
+                 * at the end it is turned into a String and later we can see
+                 * below in the done() method
+                 * that we append the assistant's response to the chat area.
+                 * 
+                 * upon completion, we enable the send button again
+                 *
+                 * appendUser and appendAssistant methods
+                 * are tiny helper methods
+                 * but the modularization is very useful...
+                 * 
+                 * Here is where we call them:
+                 * 
+                 * When submit() is called (this is where doInBackground() is called...
+                 * ... as well as done() via SwingWorker) - ASYNC!!!):
+                 *      1. We call appendUser(msg) to add the user's message
+                 * When done() is automatically called...
+                 * ...(i.e, once doInBackground() is finished),
+                 *      2. We call appendAssistant(answer) to add the assistant's response.
+                 */
             }
 
             @Override
@@ -137,3 +195,5 @@ public class ChatPanel extends JPanel {
         chatArea.append("Bot: " + txt + "\n\n");
     }
 }
+
+
